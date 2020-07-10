@@ -1,4 +1,4 @@
-# CH2 normal
+# CH2 disabled
 #  Frequency	t_on-	delay	t_on+
 # (Hz)	(us)	(us)	(us)
-500  100  50  50
+200  100  50  50
