@@ -240,6 +240,9 @@ class RigolDG4102:
         self.change_state_channel(1, 'OFF')          # turn off the output for the negative pulse
         self.change_state_channel(2, 'OFF')          # turn off the output for the positive pulse
 
+    def get_ch_state(self, channel):
+        return self.ch_states[int(channel)-1]
+
 
 class MainApplication:
     # Btn_activate_text = StringVar()
@@ -310,6 +313,13 @@ class MainApplication:
         self.get_actual_data('NO')
         self.parameters.save_data(self.parameters.ch2_state)
         self.rigol.start_pulsing_rigol(self.parameters.frequency, self.frequency_changed, self.parameters.pulse_length_neg, self.parameters.pos_pulse_delay, self.parameters.pulse_length_pos, self.Entry_t_on_pos['state'])
+        self.CH1_active.set(self.rigol.get_ch_state(1))
+        self.CH2_active.set(self.rigol.get_ch_state(2))
+
+    def stop_pulsing_main(self, *args):
+        self.rigol.stop_pulsing_rigol()
+        self.CH1_active.set(self.rigol.get_ch_state(1))
+        self.CH2_active.set(self.rigol.get_ch_state(2))
 
     def plot_data_main(self, *args):
         self.get_actual_data('YES')
@@ -332,12 +342,12 @@ class MainApplication:
             # self.start_pulsing_main()
 
     def on_closing(self):
-        self.rigol.stop_pulsing_rigol()
+        self.stop_pulsing_main()
         root.destroy()
 
     def create_widgets(self, frame):
         self.Label_Frequency = tk.Label(frame, text="Pulse frequency", background=self.bgcolor)
-        self.Label_Frequency.grid(row=0, column=1, padx=(40, 10), pady=10)
+        self.Label_Frequency.grid(row=0, column=1, padx=(20, 10), pady=10)
         self.Entry_Frequency = tk.Entry(frame, width=10)
         self.Entry_Frequency.bind("<Return>", self.plot_data_main)
         self.Entry_Frequency.bind("<F10>", self.start_pulsing_main)
@@ -388,11 +398,18 @@ class MainApplication:
         self.Button_activate_CH2 = ttk.Button(frame, text="Activate", command=self.btn_activate_CH2, textvariable=self.Btn_activate_text)
         self.Button_activate_CH2.grid(row=3, column=2, padx=10, pady=10)
         self.Button_plot_data = ttk.Button(frame, text="Plot", command=self.plot_data_main)
-        self.Button_plot_data.grid(row=6, column=1, padx=10, pady=10, sticky='E')
+        self.Button_plot_data.grid(row=6, column=2, padx=10, pady=5, sticky='E')
         self.Button_send_data = ttk.Button(frame, text="Send", command=self.start_pulsing_main)
-        self.Button_send_data.grid(row=6, column=2, rowspan = 2, padx=10, pady=10)
-        self.Button_stop = ttk.Button(frame, text="Stop", command=self.rigol.stop_pulsing_rigol)
-        self.Button_stop.grid(row=6, column=5, padx=10, pady=10)
+        self.Button_send_data.grid(row=7, column=2, padx=10, pady=5)
+        self.Button_stop = ttk.Button(frame, text="Stop", command=self.stop_pulsing_main)
+        self.Button_stop.grid(row=8, column=2, padx=10, pady=5)
+
+        self.CH1_active = tk.IntVar()
+        self.CheckButton_CH1_active = ttk.Checkbutton(frame, text="CH 1 active", state=tk.DISABLED, variable=self.CH1_active)
+        self.CheckButton_CH1_active.grid(row=7, column=1, padx=10, pady=5)
+        self.CH2_active = tk.IntVar()
+        self.CheckButton_CH2_active = ttk.Checkbutton(frame, text="CH 2 active", state=tk.DISABLED, variable=self.CH2_active)
+        self.CheckButton_CH2_active.grid(row=8, column=1, padx=10, pady=5)
 
         self.m_plot.plot_waveforms(self.parameters.ch2_state, self.parameters.pulse_length_neg, self.parameters.pos_pulse_delay, self.parameters.pulse_length_pos, self.parameters.period)
 
