@@ -2,41 +2,8 @@ import numpy as np
 import pyvisa
 import time
 
-# class for storing the discharge parameters
-class RigolDG4102Params:
-    def __init__(self):
-        self.ch2_state = ''     # state of the channel 2 (enabled or disabled)
-        self.frequency = 0      # frequency of the pulses
-        self.period = 0         # period
-        self.pulse_length_neg = 0   # Time duration of the negative pulse length
-        self.pos_pulse_delay = 0    # Time duration of the delay of the positive pulse
-        self.pulse_length_pos = 0   # Time duration of the positive pulse length
-        self.load_data()            # load saved data from the file "saved_data.txt"
 
-    # load saved data from the file "saved_data.txt"
-    def load_data(self):
-        with open('saved_data.txt', 'r') as f:  # open the file
-            line = f.readline().split()         # read first line of the file
-            self.ch2_state = line[2]            # split the line into simple strings
-            f.close()                           # close the file
-        data = np.loadtxt('saved_data.txt', skiprows=3, dtype=[('frequency', 'int32'),
-                          ('t_on-', 'int32'), ('delay', 'int32'), ('t_on+', 'int32')])  # read the matrix of value from
-        # the file (first three lines are skipped)
-        self.frequency = data['frequency']      # initialize the values
-        self.pulse_length_neg = data['t_on-']   # ...
-        self.pos_pulse_delay = data['delay']    # ...
-        self.pulse_length_pos = data['t_on+']   # ...s
-        self.period = int(1e6/self.frequency)   # calculate the period
-
-    # save the discharge parameters to the file "saved_data.txt"
-    def save_data(self, ch2_state):
-        # ch2_state - state of the channel 2 (enabled or disabled)
-        data = np.array([self.frequency, self.pulse_length_neg, self.pos_pulse_delay, self.pulse_length_pos])
-        np.savetxt('saved_data.txt', data[None], delimiter='  ', header='CH2 ' + ch2_state +
-                   '\n Frequency	t_on-	delay	t_on+\n(Hz)	(us)	(us)	(us)', fmt='%i')
-
-
-# HiPIMS pulser virtual intrument based on Rigol DG4102 waveform generator
+# HiPIMS pulser virtual instrument based on Rigol DG4102 waveform generator
 class RigolDG4102Pulser:
     def __init__(self):
         self._amplitude = 3.7   # both channels have fixed amplitude 3.7 V
@@ -68,10 +35,13 @@ class RigolDG4102Pulser:
         self.__cmd_frequency()   # set frequency and amplitude for both channels
         self._inst.write(":SOURce1:TRACE:DATA:POINts:INTerpolate OFF")  # unset the linear interpolation of the points
         self._inst.write(":SOURce2:TRACE:DATA:POINts:INTerpolate OFF")  # unset the linear interpolation of the points
-        # set negative pulse modulation
+        # set negative pulse
+        self.__cmd_pulse_shape(1)
         self.__cmd_negative_pulse_modulation()
-        # set positive pulse synchronization
+        # set positive pulse
+        self.__cmd_pulse_shape(2)
         self.__cmd_positive_pulse_synchronization()
+        self._output = False
         self._connected = True  # set connected to True if not exception has been risen so far
 
     @property    # output
@@ -80,7 +50,9 @@ class RigolDG4102Pulser:
 
     @output.setter
     def output(self, value):   # set output
-        if value != self._output:  # if different from actual value
+        if not self._connected:
+            self._output = False
+        elif value != self._output:  # if different from actual value
             self._output = value
             str_value = 'ON' if value else 'OFF'
             if self._ch2_enabled:   # set both channels
@@ -96,12 +68,13 @@ class RigolDG4102Pulser:
     @ch2_enabled.setter
     def ch2_enabled(self, value):
         self._ch2_enabled = value
-        if value:   # if channel 2 is being enabled
-            self.__cmd_pulse_shape(2)
-            self.__cmd_positive_pulse_synchronization()
-            self._inst.write(':OUTPut2 ON')
-        else:
-            self._inst.write(':OUTPut2 OFF')
+        if self._connected:
+            if value:   # if channel 2 is being enabled
+                self.__cmd_pulse_shape(2)
+                self.__cmd_positive_pulse_synchronization()
+                self._inst.write(':OUTPut2 ON')
+            else:
+                self._inst.write(':OUTPut2 OFF')
 
     @property   # frequency
     def frequency(self):
@@ -120,21 +93,21 @@ class RigolDG4102Pulser:
             raise ValueError(u'T\u2092\u2099\u207B + delay + T\u2092\u2099\u207A needs to be lower than the period'
                              + u' time (' + str(period) + '\u00B5s)')
         if int_value != self._frequency:  # do something only if frequency is changed
-            is_pulsing = self._output  # save whether pulsing is active
-            if is_pulsing:
-                self.output(False)   # stop pulsing while changing the frequency
-                time.sleep(0.1)   # wait some time
             self._frequency = int_value
-            self.__cmd_frequency()  # update frequency in instrument
-            time.sleep(0.1)
-            self.__cmd_pulse_shape(1)   # update pulse shape which depends on frequency
-            self.__cmd_negative_pulse_modulation()  # needs to be started again with every change of the pulse shape
-            if self._ch2_enabled:  # update pulse shape for positive pulse if active
-                self.__cmd_pulse_shape(2)
-                self.__cmd_positive_pulse_synchronization()  # likely needs to be started again as well
-            time.sleep(0.1)
-            self.output(is_pulsing)
-            # self.output = is_pulsing  # return to previous state
+            if self._connected:
+                if self._output and self._ch2_enabled:  # if pulsing and ch2 enabled
+                    self.__cmd_channel_state(2, False)   # turn off channel 2 while changing negative pulse length
+                    time.sleep(0.1)  # wait some time
+                self.__cmd_frequency()  # update frequency in instrument
+                time.sleep(0.1)
+                self.__cmd_pulse_shape(1)   # update pulse shape which depends on frequency
+                self.__cmd_negative_pulse_modulation()  # needs to be started again with every change of the pulse shape
+                if self._ch2_enabled:  # update pulse shape for positive pulse if active
+                    self.__cmd_pulse_shape(2)
+                    self.__cmd_positive_pulse_synchronization()  # likely needs to be started again as well
+                time.sleep(0.1)
+                if self._ch2_enabled:
+                    self.__cmd_channel_state(2, True)  # turn channel 2 on again
 
     @property
     def neg_pulse_length(self):
@@ -154,17 +127,18 @@ class RigolDG4102Pulser:
                              + u' time (' + str(period) + '\u00B5s)')
         if int_value != self._neg_pulse_length:
             self._neg_pulse_length = int_value  # update the value
-            if self._output and self._ch2_enabled:  # if pulsing and ch2 enabled
-                self.__cmd_channel_state(2, False)   # turn off channel 2 while changing negative pulse length
-                time.sleep(0.1)  # wait some time
-            self.__cmd_pulse_shape(1)  # update pulse shape
-            self.__cmd_negative_pulse_modulation()  # needs to be started again with every change of the pulse shape
-            if self._ch2_enabled:  # update pulse shape for positive pulse if active
-                self.__cmd_pulse_shape(2)
-                self.__cmd_positive_pulse_synchronization()
-            time.sleep(0.1)
-            if self._ch2_enabled:
-                self.__cmd_channel_state(2, True)  # turn channel 2 on again
+            if self._connected:
+                if self._output and self._ch2_enabled:  # if pulsing and ch2 enabled
+                    self.__cmd_channel_state(2, False)   # turn off channel 2 while changing negative pulse length
+                    time.sleep(0.1)  # wait some time
+                self.__cmd_pulse_shape(1)  # update pulse shape
+                self.__cmd_negative_pulse_modulation()  # needs to be started again with every change of the pulse shape
+                if self._ch2_enabled:  # update pulse shape for positive pulse if active
+                    self.__cmd_pulse_shape(2)
+                    self.__cmd_positive_pulse_synchronization()
+                time.sleep(0.1)
+                if self._ch2_enabled:
+                    self.__cmd_channel_state(2, True)  # turn channel 2 on again
 
     @property
     def pos_pulse_delay(self):
@@ -184,8 +158,9 @@ class RigolDG4102Pulser:
                              + u' time (' + str(period) + '\u00B5s)')
         if int_value != self._pos_pulse_delay:
             self._pos_pulse_delay = int_value    # update the value
-            self.__cmd_pulse_shape(2)
-            self.__cmd_positive_pulse_synchronization()
+            if self._connected:
+                self.__cmd_pulse_shape(2)
+                self.__cmd_positive_pulse_synchronization()
 
     @property
     def pos_pulse_length(self):
@@ -205,8 +180,12 @@ class RigolDG4102Pulser:
                              + u' time (' + str(period) + '\u00B5s)')
         if int_value != self._pos_pulse_length:
             self._pos_pulse_length = int_value  # update the value
-            self.__cmd_pulse_shape(2)
-            self.__cmd_positive_pulse_synchronization()
+            if self._connected:
+                self.__cmd_pulse_shape(2)
+                self.__cmd_positive_pulse_synchronization()
+
+    def get_period(self):
+        return int(1e6/self._frequency)
 
     def __cmd_channel_state(self, channel, value):
         str_value = 'ON' if value else 'OFF'
@@ -225,8 +204,53 @@ class RigolDG4102Pulser:
         self._inst.write(':SOURce1:APPLy:CUSTom ' + str(self._frequency * self._frequency_coefficient_ch2) +
                          ',' + str(2 * self._amplitude) + ',0,0')  # channel 2, increase by 1 percent, see coefficient
 
-    def set_pulse_parameters(self, frequency, neg_ton, pos_delay, pos_ton):
-        return
+    def set_all(self, frequency, neg_ton, pos_delay, pos_ton, ch2_enabled):
+        try:
+            int_frequency = int(frequency)
+        except ValueError:
+            raise ValueError('Frequency input must be an integer')
+        if int_frequency > 10000:
+            raise ValueError('Frequency input must be lower than 10 kHz')
+        try:
+            int_neg_ton = int(neg_ton)
+        except ValueError:
+            raise ValueError('Pulse length input must be an integer')
+        if int_neg_ton < 5:
+            raise ValueError('Pulse length input must be at least 5 us')
+        try:
+            int_pos_ton = int(pos_ton)
+        except ValueError:
+            raise ValueError('Pulse length input must be an integer')
+        if int_pos_ton < 5:
+            raise ValueError('Pulse length input must be at least 5 us')
+        try:
+            int_pos_delay = int(pos_delay)
+        except ValueError:
+            raise ValueError('Pulse delay input must be an integer')
+        if int_pos_delay < 5:
+            raise ValueError('Pulse delay input must be at least 5 us')
+        if int_neg_ton + int_pos_delay + int_pos_ton >= int(1e6 / int_frequency):
+            period = int(1e6 / self._frequency)
+            raise ValueError(u'T\u2092\u2099\u207B + delay + T\u2092\u2099\u207A needs to be lower than the period'
+                             + u' time (' + str(period) + '\u00B5s)')
+        self._frequency = int_frequency
+        self._neg_pulse_length = int_neg_ton
+        self._pos_pulse_delay = int_pos_delay
+        self._pos_pulse_length = int_pos_delay
+        if self._connected:
+            if self._output and self._ch2_enabled:  # if pulsing and ch2 enabled
+                self.__cmd_channel_state(2, False)  # turn off channel 2 while changing negative pulse length
+                time.sleep(0.1)  # wait some time
+            self.__cmd_frequency()  # update frequency in instrument
+            time.sleep(0.1)
+            self.__cmd_pulse_shape(1)  # update pulse shape which depends on frequency
+            self.__cmd_negative_pulse_modulation()  # needs to be started again with every change of the pulse shape
+            if self._ch2_enabled:  # update pulse shape for positive pulse if active
+                self.__cmd_pulse_shape(2)
+                self.__cmd_positive_pulse_synchronization()  # likely needs to be started again as well
+            time.sleep(0.1)
+            if self._ch2_enabled:
+                self.__cmd_channel_state(2, True)  # turn channel 2 on again
 
     # send commands to enable negative pulse modulation for arc detection
     def __cmd_negative_pulse_modulation(self):

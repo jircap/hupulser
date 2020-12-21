@@ -3,25 +3,9 @@ from tkinter import messagebox
 from tkinter import ttk
 from matplotlib.backends.backend_tkagg import (FigureCanvasTkAgg)
 from matplotlib.figure import Figure
-from rigol_4102 import RigolDG4102Pulser, RigolDG4102Params
+from rigol_4102 import RigolDG4102Pulser
+import configparser
 import numpy as np
-
-
-def test_data(number):
-    try:
-        val = int(number)
-        if val < 5:
-            messagebox.showerror(title='Error', message='One of the numbers is lower than 5 us')
-            return 'false'
-        return 'true'
-    except ValueError:
-        try:
-            float(number)
-            messagebox.showerror(title='Error', message='One of the numbers is a float number')
-            return 'false'
-        except ValueError:
-            messagebox.showerror(title='Error', message='One of the numbers is a string')
-            return 'false'
 
 
 # class for plotting the entered data using Matplotlib
@@ -63,7 +47,7 @@ class MatplotlibPlot:
         self.ax.set_xlabel('Time [us]')     # set x label
         self.ax.set_ylabel('Voltage [V]')   # set y label
         self.ax.plot(t, y_neg, color='red')     # plot the wave form of the negative pulse using a red color
-        if ch2_state == 'normal':               # when CH2 is enabled
+        if ch2_state:               # when CH2 is enabled
             self.ax.plot(t, y_pos, color='blue')    # plot the wave form of the positive pulse using a blue color
         self.canvas.draw()  # show the canvas at the screen
 
@@ -79,7 +63,15 @@ class HuPulserGui:
         self.root = master
         master.title(":* pulsed power supply control")
         # load last state of GUI
-        self.parameters = RigolDG4102Params()  # TODO change name
+        self.config = configparser.ConfigParser()
+        self.config.read('hupulser.ini')
+        # **** init hardware objects ****
+        self.pulser = RigolDG4102Pulser()
+        self.pulser.set_all(self.config['RigolPulser']['frequency'],
+                            self.config['RigolPulser']['neg_length'],
+                            self.config['RigolPulser']['pos_delay'],
+                            self.config['RigolPulser']['pos_length'],
+                            self.config['RigolPulser']['ch2_enabled'])
 
         # main frame
         main_frame = tk.Frame(master, background=self.bg_color)
@@ -107,14 +99,11 @@ class HuPulserGui:
         self.Label_Frequency = tk.Label(pulser_frame, text="Pulse frequency", background=self.bg_color)
         self.Label_Frequency.grid(row=1, column=0, padx=5, pady=(10, 0), sticky='E')
         self.Entry_Frequency = tk.Entry(pulser_frame, width=10)
-        self.Entry_Frequency.id = 'freq'
-        # self.Entry_Frequency.bind("<Return>", self.plot_data_main)
+        self.Entry_Frequency.inst_property = RigolDG4102Pulser.frequency
         self.Entry_Frequency.bind("<Return>", self.entry_confirmed)
-        self.Entry_Frequency.bind("<KeyRelease>", self.entry_modified)
-        self.Entry_Frequency.bind("<F10>", self.start_pulsing_main)
-
+        self.Entry_Frequency.bind("<FocusOut>", self.entry_modified)
         self.Entry_Frequency.grid(row=1, column=1, padx=5, pady=(10, 0), sticky='E')
-        self.Entry_Frequency.insert(0, str(self.parameters.frequency))
+        self.Entry_Frequency.insert(0, self.pulser.frequency)
         self.Label_Frequency_Units = tk.Label(pulser_frame, text="Hz", background=self.bg_color)
         self.Label_Frequency_Units.grid(row=1, column=2, padx=5, pady=(10, 0), sticky='W')
 
@@ -124,21 +113,18 @@ class HuPulserGui:
         self.Label_t_on_neg = tk.Label(pulser_frame, text=u'T\u2092\u2099\u207B', background=self.bg_color)
         self.Label_t_on_neg.grid(row=3, column=0, padx=5, sticky='E')
         self.Entry_t_on_neg = tk.Entry(pulser_frame, width=10)
-        # self.Entry_t_on_neg.focus_set()
-        self.Entry_t_on_neg.bind("<Return>", self.plot_data_main)
-        self.Entry_t_on_neg.bind("<F10>", self.start_pulsing_main)
+        self.Entry_t_on_neg.inst_property = RigolDG4102Pulser.neg_pulse_length
+        self.Entry_t_on_neg.bind("<Return>", self.entry_confirmed)
+        self.Entry_t_on_neg.bind("<FocusOut>", self.entry_modified)
         self.Entry_t_on_neg.grid(row=3, column=1, padx=5, sticky='E')
-        self.Entry_t_on_neg.insert(0, str(self.parameters.pulse_length_neg))
+        self.Entry_t_on_neg.insert(0, self.pulser.neg_pulse_length)
         self.Label_t_on_neg_Units = tk.Label(pulser_frame, text=u'\u00B5s', background=self.bg_color)
         self.Label_t_on_neg_Units.grid(row=3, column=2, padx=5, sticky='W')
 
         self.Label_Channel2 = tk.Label(pulser_frame, text="Channel 2", background=self.bg_color)
         self.Label_Channel2.grid(row=4, column=0, padx=5, pady=(5, 0), sticky='E')
         self.Btn_activate_text = tk.StringVar(pulser_frame)
-        if self.parameters.ch2_state == 'disabled':
-            self.Btn_activate_text.set("Enable")
-        else:
-            self.Btn_activate_text.set("Disable")
+        self.Btn_activate_text.set('Disable') if self.pulser.ch2_enabled else self.Btn_activate_text.set('Enable')
         self.Button_activate_ch2 = ttk.Button(pulser_frame, text="Activate", command=self.btn_activate_ch2,
                                               textvariable=self.Btn_activate_text)
         self.Button_activate_ch2.grid(row=4, column=1, padx=5, pady=(5, 0))
@@ -146,43 +132,47 @@ class HuPulserGui:
         self.Label_delay_pulse_pos = tk.Label(pulser_frame, text='Delay', background=self.bg_color)
         self.Label_delay_pulse_pos.grid(row=5, column=0, padx=5, sticky='E')
         self.Entry_delay_pulse_pos = tk.Entry(pulser_frame, width=10)
-        self.Entry_delay_pulse_pos.bind("<Return>", self.plot_data_main)
-        self.Entry_delay_pulse_pos.bind("<F10>", self.start_pulsing_main)
+        self.Entry_delay_pulse_pos.inst_property = RigolDG4102Pulser.pos_pulse_delay
+        self.Entry_delay_pulse_pos.bind("<Return>", self.entry_confirmed)
+        self.Entry_delay_pulse_pos.bind("<FocusOut>", self.entry_modified)
         self.Entry_delay_pulse_pos.grid(row=5, column=1, padx=5, sticky='E')
-        self.Entry_delay_pulse_pos.insert(0, str(self.parameters.pos_pulse_delay))
-        self.Entry_delay_pulse_pos['state'] = self.parameters.ch2_state
+        self.Entry_delay_pulse_pos.insert(0, self.pulser.pos_pulse_delay)
+        if self.pulser.ch2_enabled:
+            self.Entry_delay_pulse_pos['state'] = tk.NORMAL
+        else:
+            self.Entry_delay_pulse_pos['state'] = tk.DISABLED
         self.Label_delay_pulse_pos_Units = tk.Label(pulser_frame, text=u'\u00B5s', background=self.bg_color)
         self.Label_delay_pulse_pos_Units.grid(row=5, column=2, padx=5, sticky='W')
 
         self.Label_t_on_pos = tk.Label(pulser_frame, text=u'T\u2092\u2099\u207A', background=self.bg_color)
         self.Label_t_on_pos.grid(row=6, column=0, padx=5, sticky='E')
         self.Entry_t_on_pos = tk.Entry(pulser_frame, width=10)
-        self.Entry_t_on_pos.bind("<F10>", self.start_pulsing_main)
-        self.Entry_t_on_pos.bind("<Return>", self.plot_data_main)
+        self.Entry_t_on_pos.inst_property = RigolDG4102Pulser.pos_pulse_length
+        self.Entry_t_on_pos.bind("<FocusOut>", self.entry_modified)
+        self.Entry_t_on_pos.bind("<Return>", self.entry_confirmed)
         self.Entry_t_on_pos.grid(row=6, column=1, padx=5, sticky='E')
-        self.Entry_t_on_pos.insert(0, str(self.parameters.pulse_length_pos))
-        self.Entry_t_on_pos['state'] = self.parameters.ch2_state
+        self.Entry_t_on_pos.insert(0, self.pulser.pos_pulse_length)
+        if self.pulser.ch2_enabled:
+            self.Entry_t_on_pos['state'] = tk.NORMAL
+        else:
+            self.Entry_t_on_pos['state'] = tk.DISABLED
         self.Label_t_on_pos_Units = tk.Label(pulser_frame, text=u'\u00B5s', background=self.bg_color)
         self.Label_t_on_pos_Units.grid(row=6, column=2, padx=5, sticky='W')
 
-        self.Button_plot_data = ttk.Button(pulser_frame, text="Plot", command=self.plot_data_main)
-        self.Button_plot_data.grid(row=7, column=1, padx=5, pady=(5, 0))
-        self.Button_send_data = ttk.Button(pulser_frame, text="Send", command=self.start_pulsing_main)
-        self.Button_send_data.grid(row=8, column=1, padx=5, pady=0)
-        self.Button_stop = ttk.Button(pulser_frame, text="Stop", command=self.stop_pulsing_main)
+        self.Button_start = ttk.Button(pulser_frame, text="Start", command=self.start_pulsing)
+        self.Button_start.grid(row=8, column=1, padx=5, pady=0)
+        self.Button_stop = ttk.Button(pulser_frame, text="Stop", command=self.stop_pulsing)
         self.Button_stop.grid(row=9, column=1, padx=5, pady=0)
 
-        self.ch1_active = tk.IntVar()
+        self.ch1_active = tk.BooleanVar()
         self.CheckButton_CH1_active = ttk.Checkbutton(pulser_frame, text="CH 1 active", state=tk.DISABLED,
                                                       variable=self.ch1_active)
         self.CheckButton_CH1_active.grid(row=8, column=0, padx=5, pady=5)
-        self.ch2_active = tk.IntVar()
+
+        self.ch2_active = tk.BooleanVar()
         self.CheckButton_ch2_active = ttk.Checkbutton(pulser_frame, text="CH 2 active", state=tk.DISABLED,
                                                       variable=self.ch2_active)
         self.CheckButton_ch2_active.grid(row=9, column=0, padx=5, pady=5)
-
-        self.frequency_old = self.parameters.frequency
-        self.frequency_changed = 'YES'
 
         plot_frame = tk.LabelFrame(main_frame, background=self.bg_color, borderwidth=2, relief=tk.RIDGE,
                                    text='  PLOT  ')
@@ -192,100 +182,71 @@ class HuPulserGui:
                                   command=self.change_plot_scale, background=self.bg_color)
         self.PlotScale.set(100)
         self.PlotScale.pack()
-        self.m_plot.plot_waveforms(self.parameters.ch2_state, self.parameters.pulse_length_neg,
-                                   self.parameters.pos_pulse_delay, self.parameters.pulse_length_pos,
-                                   self.parameters.period, self.PlotScale.get())
-
-        # **** init hardware objects ****
-        self.pulser = RigolDG4102Pulser()
+        self.m_plot.plot_waveforms(self.pulser.ch2_enabled, self.pulser.neg_pulse_length, self.pulser.pos_pulse_delay,
+                                   self.pulser.pos_pulse_length, self.pulser.get_period(), self.PlotScale.get())
 
     def change_plot_scale(self, value):
         value = int(value)
-        self.m_plot.set_x_lim(self.parameters.period, value)
+        self.m_plot.set_x_lim(self.pulser.get_period(), value)
         self.m_plot.canvas.draw()  # show the canvas at the screen
 
-    def get_actual_data(self, plot_data):
-        value_frequency = self.Entry_Frequency.get()
-        value_t_on_neg = self.Entry_t_on_neg.get()
-        value_delay = self.Entry_delay_pulse_pos.get()
-        value_t_on_pos = self.Entry_t_on_pos.get()
-        value_period = int(1e6 / int(value_frequency))
-
-        if test_data(value_frequency) == 'true' and test_data(value_t_on_neg) == 'true' \
-                and test_data(value_delay) == 'true' and test_data(value_t_on_pos) == 'true':
-            if (int(value_t_on_neg) + int(value_delay) + int(value_t_on_pos)) < value_period:
-                if int(value_frequency) < 10001:
-                    self.parameters.pulse_length_neg = int(value_t_on_neg)
-                    self.parameters.pos_pulse_delay = int(value_delay)
-                    self.parameters.pulse_length_pos = int(value_t_on_pos)
-                    self.parameters.frequency = int(value_frequency)
-                    self.parameters.period = int(1e6 / int(value_frequency))
-                    if plot_data == 'NO':
-                        if value_frequency == self.frequency_old:
-                            self.frequency_changed = 'NO'
-                        else:
-                            self.frequency_changed = 'YES'
-                            self.frequency_old = value_frequency
-                    else:
-                        self.frequency_changed = 'NO'
-                else:
-                    messagebox.showerror(title='Error', message='Frequency needs to be lower than 10 kHz.')
-            else:
-                messagebox.showerror(title='Error', message=u'T\u2092\u2099\u207B + delay + '
-                                                            u'T\u2092\u2099\u207A needs to be lower than the period'
-                                                            u' time (' + str(value_period) + '\u00B5s)')
-
     def entry_modified(self, event):
-        print(event)
-        print(event.widget.get())
-        event.widget.config(fg='blue')
+        # check if new value is different from instrument value
+        try:
+            new_value = int(event.widget.get())
+            value = event.widget.inst_property.fget(self.pulser)  # use property link stored in widget and pulser instance
+            # to get the value stored in pulser class instance
+            if new_value != value:
+                event.widget.config(fg='red')
+            else:
+                event.widget.config(fg='black')
+        except ValueError:
+            event.widget.config(fg='red')
 
     def entry_confirmed(self, event):
-        event.widget.config(fg='black')
-        print(event.widget.id)
+        try:
+            event.widget.inst_property.fset(self.pulser, event.widget.get())
+            event.widget.config(fg='black')
+            self.plot_data()
+        except ValueError as e:
+            messagebox.showerror('Error', str(e))
 
-    def start_pulsing_main(self, *args):
-        if self.pulser_connected.get():
-            self.get_actual_data('NO')
-            self.parameters.save_data(self.parameters.ch2_state)
-            self.pulser.start_pulsing_rigol(self.parameters.frequency, self.frequency_changed,
-                                            self.parameters.pulse_length_neg, self.parameters.pos_pulse_delay,
-                                            self.parameters.pulse_length_pos, self.Entry_t_on_pos['state'])
-            self.ch1_active.set(self.pulser.get_channel_state(1))
-            self.ch2_active.set(self.pulser.get_channel_state(2))
+    def start_pulsing(self, *args):
+        self.pulser.output = True
+        self.ch1_active.set(self.pulser.output)
+        self.ch2_active.set(self.pulser.output and self.pulser.ch2_enabled)
 
-    def stop_pulsing_main(self, *args):
-        if self.pulser_connected.get():
-            self.pulser.stop_pulsing_rigol()
-            self.ch1_active.set(self.pulser.get_channel_state(1))
-            self.ch2_active.set(self.pulser.get_channel_state(2))
+    def stop_pulsing(self, *args):
+        self.pulser.output = False
+        self.ch1_active.set(self.pulser.output)
+        self.ch2_active.set(self.pulser.output and self.pulser.ch2_enabled)
 
-    def plot_data_main(self, *args):
-        self.get_actual_data('YES')
-        # self.parameters.save_data(self.parameters.ch2_state)
-        # self.pulser.start_pulsing_rigol(self.parameters.frequency, self.frequency_changed,
-        # self.parameters.pulse_length_neg, self.parameters.pos_pulse_delay, self.parameters.pulse_length_pos,
-        # self.Entry_t_on_pos['state'])
-        self.m_plot.plot_waveforms(self.parameters.ch2_state, self.parameters.pulse_length_neg,
-                                   self.parameters.pos_pulse_delay, self.parameters.pulse_length_pos,
-                                   self.parameters.period, self.PlotScale.get())
+    def plot_data(self, *args):
+        self.m_plot.plot_waveforms(self.pulser.ch2_enabled, self.pulser.neg_pulse_length, self.pulser.pos_pulse_delay,
+                                   self.pulser.pos_pulse_length, self.pulser.get_period(), self.PlotScale.get())
 
     def btn_activate_ch2(self):
         if self.Entry_t_on_pos['state'] == tk.NORMAL:
             self.Entry_t_on_pos.config(state=tk.DISABLED)
             self.Entry_delay_pulse_pos.config(state=tk.DISABLED)
             self.Btn_activate_text.set("Enable")
-            self.parameters.ch2_state = 'disabled'
-            # self.pulser.change_state_channel(2, 'OFF')
+            self.pulser.ch2_enabled = False
+            self.plot_data()
         else:
             self.Entry_t_on_pos.config(state=tk.NORMAL)
             self.Entry_delay_pulse_pos.config(state=tk.NORMAL)
             self.Btn_activate_text.set("Disable")
-            self.parameters.ch2_state = 'normal'
-            # self.start_pulsing_main()
+            self.pulser.ch2_enabled = True
+            self.plot_data()
 
     def on_closing(self):
-        self.stop_pulsing_main()
+        self.stop_pulsing()   # stop pulsing
+        self.config['RigolPulser'] = {'frequency': self.pulser.frequency, 'neg_length': self.pulser.neg_pulse_length,
+                                      'pos_delay': self.pulser.pos_pulse_delay,
+                                      'pos_length': self.pulser.pos_pulse_length,
+                                      'ch2_enabled': self.pulser.ch2_enabled}
+        with open('hupulser.ini', 'w') as config_file:
+            self.config.write(config_file)
         self.root.destroy()
 
     def pulser_connect(self):
@@ -297,4 +258,4 @@ class HuPulserGui:
                 self.pulser_connected.set(0)
                 messagebox.showerror('Error', 'Connection to RigolDG4102 failed\n\n'+str(e))
         else:
-            self.stop_pulsing_main()
+            self.stop_pulsing()
