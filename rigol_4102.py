@@ -44,6 +44,12 @@ class RigolDG4102Pulser:
         self._output = False
         self._connected = True  # set connected to True if not exception has been risen so far
 
+    def disconnect(self):
+        if self._output:
+            self.output = False  # stop pulsing
+        self._inst.close()
+        self._connected = False
+
     @property    # output
     def output(self):   # get output
         return self._output
@@ -72,7 +78,8 @@ class RigolDG4102Pulser:
             if value:   # if channel 2 is being enabled
                 self.__cmd_pulse_shape(2)
                 self.__cmd_positive_pulse_synchronization()
-                self._inst.write(':OUTPut2 ON')
+                if self._output:
+                    self._inst.write(':OUTPut2 ON')
             else:
                 self._inst.write(':OUTPut2 OFF')
 
@@ -95,9 +102,10 @@ class RigolDG4102Pulser:
         if int_value != self._frequency:  # do something only if frequency is changed
             self._frequency = int_value
             if self._connected:
-                if self._output and self._ch2_enabled:  # if pulsing and ch2 enabled
-                    self.__cmd_channel_state(2, False)   # turn off channel 2 while changing negative pulse length
-                    time.sleep(0.1)  # wait some time
+                is_pulsing = self._output  # save if the pulser is active
+                if is_pulsing:
+                    self.output = False   # turn of the output before frequency is changed
+                    time.sleep(0.1)
                 self.__cmd_frequency()  # update frequency in instrument
                 time.sleep(0.1)
                 self.__cmd_pulse_shape(1)   # update pulse shape which depends on frequency
@@ -106,8 +114,8 @@ class RigolDG4102Pulser:
                     self.__cmd_pulse_shape(2)
                     self.__cmd_positive_pulse_synchronization()  # likely needs to be started again as well
                 time.sleep(0.1)
-                if self._ch2_enabled:
-                    self.__cmd_channel_state(2, True)  # turn channel 2 on again
+                if is_pulsing:
+                    self.output = True   # turn output on again
 
     @property
     def neg_pulse_length(self):
@@ -201,7 +209,7 @@ class RigolDG4102Pulser:
         # amplitude must be multiplied by 2
         self._inst.write(':SOURce1:APPLy:CUSTom ' + str(self._frequency) +
                          ',' + str(2 * self._amplitude) + ',0,0')  # channel 1
-        self._inst.write(':SOURce1:APPLy:CUSTom ' + str(self._frequency * self._frequency_coefficient_ch2) +
+        self._inst.write(':SOURce2:APPLy:CUSTom ' + str(self._frequency * self._frequency_coefficient_ch2) +
                          ',' + str(2 * self._amplitude) + ',0,0')  # channel 2, increase by 1 percent, see coefficient
 
     def set_all(self, frequency, neg_ton, pos_delay, pos_ton, ch2_enabled):
@@ -238,9 +246,10 @@ class RigolDG4102Pulser:
         self._pos_pulse_delay = int_pos_delay
         self._pos_pulse_length = int_pos_delay
         if self._connected:
-            if self._output and self._ch2_enabled:  # if pulsing and ch2 enabled
-                self.__cmd_channel_state(2, False)  # turn off channel 2 while changing negative pulse length
-                time.sleep(0.1)  # wait some time
+            is_pulsing = self._output  # save if the pulser is active
+            if is_pulsing:
+                self.output = False  # turn of the output before frequency is changed
+                time.sleep(0.1)
             self.__cmd_frequency()  # update frequency in instrument
             time.sleep(0.1)
             self.__cmd_pulse_shape(1)  # update pulse shape which depends on frequency
@@ -249,8 +258,8 @@ class RigolDG4102Pulser:
                 self.__cmd_pulse_shape(2)
                 self.__cmd_positive_pulse_synchronization()  # likely needs to be started again as well
             time.sleep(0.1)
-            if self._ch2_enabled:
-                self.__cmd_channel_state(2, True)  # turn channel 2 on again
+            if is_pulsing:
+                self.output = True  # turn output on again
 
     # send commands to enable negative pulse modulation for arc detection
     def __cmd_negative_pulse_modulation(self):
