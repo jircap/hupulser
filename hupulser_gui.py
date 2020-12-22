@@ -62,16 +62,19 @@ class HuPulserGui:
         self.bg_color = '#f5f5f5'
         self.root = master
         master.title(":* pulsed power supply control")
+        # **** init hardware objects ****
+        self.pulser = RigolDG4102Pulser()
         # load last state of GUI
         self.config = configparser.ConfigParser()
         self.config.read('hupulser.ini')
-        # **** init hardware objects ****
-        self.pulser = RigolDG4102Pulser()
-        self.pulser.set_all(self.config['RigolPulser']['frequency'],
-                            self.config['RigolPulser']['neg_length'],
-                            self.config['RigolPulser']['pos_delay'],
-                            self.config['RigolPulser']['pos_length'],
-                            self.config['RigolPulser']['ch2_enabled'])
+        try:
+            self.pulser.set_all(self.config['RigolPulser']['frequency'],
+                                self.config['RigolPulser']['neg_length'],
+                                self.config['RigolPulser']['pos_delay'],
+                                self.config['RigolPulser']['pos_length'],
+                                self.config['RigolPulser']['ch2_enabled'])
+        except KeyError:  # key RigolPulser not found in config (no config present)
+            messagebox.showinfo('Info', 'Config for RigolPulser not found')
 
         # main frame
         main_frame = tk.Frame(master, background=self.bg_color)
@@ -238,6 +241,7 @@ class HuPulserGui:
             self.Btn_activate_text.set("Disable")
             self.pulser.ch2_enabled = True
             self.plot_data()
+        self.ch2_active.set(self.pulser.output and self.pulser.ch2_enabled)
 
     def on_closing(self):
         self.stop_pulsing()   # stop pulsing
@@ -259,3 +263,4 @@ class HuPulserGui:
                 messagebox.showerror('Error', 'Connection to RigolDG4102 failed\n\n'+str(e))
         else:
             self.stop_pulsing()
+            self.pulser.disconnect()
