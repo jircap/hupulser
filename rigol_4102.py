@@ -3,7 +3,6 @@ import pyvisa
 import time
 
 
-# HiPIMS pulser virtual instrument based on Rigol DG4102 waveform generator
 class RigolDG4102Pulser:
     def __init__(self):
         self._amplitude = 3.7   # both channels have fixed amplitude 3.7 V
@@ -24,7 +23,9 @@ class RigolDG4102Pulser:
     def connect(self, visa_resource_id):
         rm = pyvisa.ResourceManager()
         # connect to a specific instrument
-        self._inst = rm.open_resource(visa_resource_id, open_timeout=1000, chunk_size=1024000)
+
+        self._inst = rm.open_resource(visa_resource_id, open_timeout=1000,
+                                      resource_pyclass=pyvisa.resources.MessageBasedResource)
         # instrument initialization
         self._inst.write(":SYSTem:PRESet DEFault")  # set the default values of the fun. generator
         self._inst.write(":DISPlay:BRIGhtness 100")  # set the brightness of the display

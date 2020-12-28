@@ -2,7 +2,7 @@ import tkinter as tk
 
 
 class ToggleButton(tk.Frame):
-    def __init__(self, parent, text, on=False, ind_width=8, ind_height=20, color_on='#00a000', color_off='#006000',
+    def __init__(self, parent, text, on=False, ind_width=8, ind_height=20, color_on='#00e080', color_off='#005000',
                  **kwargs):
         tk.Frame.__init__(self, parent)
         self._on = on
@@ -39,10 +39,12 @@ class ToggleButton(tk.Frame):
 
 
 class Indicator(tk.Frame):
-    def __init__(self, parent, on=False, width=8, height=20, color_on='#00a000', color_off='#006000', **kwargs):
+    def __init__(self, parent, text, on=False, width=8, height=20, color_on='#00e080', color_off='#005000', **kwargs):
         tk.Frame.__init__(self, parent, **kwargs)
+        self.label = tk.Label(self, text=text)
+        self.label.pack(side='left')
         self.canvas = tk.Canvas(self, width=width, height=height, bg=color_off)
-        self.canvas.pack()
+        self.canvas.pack(side='left')
         self._on = on
         self.color_on = color_on
         self.color_off = color_off

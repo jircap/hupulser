@@ -15,7 +15,7 @@ if __name__ == "__main__":
     elif _platform == "darwin":
         s.theme_use("aqua")
 
+    # root.configure(bg='#f5f5f5')
     app = HuPulserGui(root)
-    root.configure(bg='#f5f5f5')
     root.protocol("WM_DELETE_WINDOW", app.on_closing)
     root.mainloop()
