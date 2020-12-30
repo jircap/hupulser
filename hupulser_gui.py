@@ -69,13 +69,19 @@ class HuPulserGui:
         self.config = configparser.ConfigParser()
         self.config.read('hupulser.ini')
         try:
-            self.pulser.set_all(self.config['RigolPulser']['frequency'],
-                                self.config['RigolPulser']['neg_length'],
-                                self.config['RigolPulser']['pos_delay'],
-                                self.config['RigolPulser']['pos_length'],
-                                self.config['RigolPulser']['ch2_enabled'])
-        except KeyError:  # key RigolPulser not found in config (no config present)
-            messagebox.showinfo('Info', 'Config for RigolPulser not found')
+            self.ps1.mode = self.config['DC1']['mode']
+            self.ps1.set_setpoints(self.config['DC1']['setpoint_power'], self.config['DC1']['setpoint_voltage'],
+                                   self.config['DC1']['setpoint_current'])
+        except KeyError:  # key Pulser not found in config (no config present)
+            messagebox.showinfo('Info', 'Config for DC1 not found')
+        try:
+            self.pulser.set_all(self.config['Pulser']['frequency'],
+                                self.config['Pulser']['neg_length'],
+                                self.config['Pulser']['pos_delay'],
+                                self.config['Pulser']['pos_length'],
+                                self.config['Pulser']['ch2_enabled'])
+        except KeyError:  # key Pulser not found in config (no config present)
+            messagebox.showinfo('Info', 'Config for Pulser not found')
 
         # main frame
         main_frame = tk.Frame(master, background=self.root['bg'])
@@ -103,7 +109,7 @@ class HuPulserGui:
         label_ps1_mode = tk.Label(ps1_mode_frame, text='Control mode')
         label_ps1_mode.grid(row=0, column=0, columnspan=3, padx=5)
         self.ps1_mode = tk.IntVar()
-        self.ps1_mode.set(0)
+        self.ps1_mode.set(self.ps1.mode)
         self.radioButton_modeP = tk.Radiobutton(ps1_mode_frame, text='P', value=0, variable=self.ps1_mode,
                                                 command=self.ps1_mode_set)
         self.radioButton_modeP.grid(row=1, column=0, padx=5, sticky='E')
@@ -120,7 +126,7 @@ class HuPulserGui:
         label_ps1_setpoint = tk.Label(ps1_values_frame, text='Setpoint')
         label_ps1_setpoint.grid(row=0, column=0, padx=5, sticky='E')
         self.entry_ps1_setpoint = tk.Entry(ps1_values_frame, width=8, justify=tk.RIGHT)
-        self.entry_ps1_setpoint.insert(0, '0')
+        self.entry_ps1_setpoint.insert(0, self.ps1.setpoint)
         self.entry_ps1_setpoint.bind("<Return>", self.ps1_setpoint_confirmed)
         self.entry_ps1_setpoint.bind("<FocusOut>", self.ps1_setpoint_modified)
         self.entry_ps1_setpoint.grid(row=0, column=1, padx=5, sticky='E')
@@ -170,7 +176,6 @@ class HuPulserGui:
         self.indicator_ps1_interlock = Indicator(ps1_indicators_frame, 'Interlock', color_on='#e00000',
                                                  color_off='#500000')
         self.indicator_ps1_interlock.grid(row=1, column=1, padx=5, sticky='E')
-
 
         # pulser frame
         pulser_frame = tk.LabelFrame(main_frame, background=self.root['bg'], borderwidth=2, relief=tk.RIDGE,
@@ -268,6 +273,17 @@ class HuPulserGui:
         self.scale_plot.pack()
         self.m_plot.plot_waveforms(self.pulser.ch2_enabled, self.pulser.neg_pulse_length, self.pulser.pos_pulse_delay,
                                    self.pulser.pos_pulse_length, self.pulser.get_period(), self.scale_plot.get())
+
+        # register after callback
+        self.root.after(1000, self.timer)
+
+    def timer(self):
+        self.indicator_ps1_active.on = not self.indicator_ps1_active.on
+        power, voltage, current = self.ps1.update_pui()
+        self.label_ps1_power.config(text=str(power))
+        self.label_ps1_voltage.config(text=str(voltage))
+        self.label_ps1_current.config(text=str(current))
+        self.root.after(1000, self.timer)
 
     def ps1_mode_set(self):
         new_mode = self.ps1_mode.get()  # get value from radiobuttons
@@ -375,10 +391,14 @@ class HuPulserGui:
 
     def on_closing(self):
         self.stop_pulsing()   # stop pulsing
-        self.config['RigolPulser'] = {'frequency': self.pulser.frequency, 'neg_length': self.pulser.neg_pulse_length,
-                                      'pos_delay': self.pulser.pos_pulse_delay,
-                                      'pos_length': self.pulser.pos_pulse_length,
-                                      'ch2_enabled': self.pulser.ch2_enabled}
+        setpoints = self.ps1.get_setpoints()
+        self.config['DC1'] = {'mode': self.ps1.mode, 'setpoint_power': setpoints[0], 'setpoint_voltage': setpoints[1],
+                              'setpoint_current': setpoints[2]}
+        self.config['Pulser'] = {'frequency': self.pulser.frequency, 'neg_length': self.pulser.neg_pulse_length,
+                                 'pos_delay': self.pulser.pos_pulse_delay,
+                                 'pos_length': self.pulser.pos_pulse_length,
+                                 'ch2_enabled': self.pulser.ch2_enabled}
+
         with open('hupulser.ini', 'w') as config_file:
             self.config.write(config_file)
         self.root.destroy()

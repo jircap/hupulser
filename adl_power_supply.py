@@ -62,6 +62,12 @@ class ADLPowerSupply:
                 raise ValueError('Setpoint readback does not match sent value')
         self._setpoint[self._mode] = int_value  # if not connected set value into virtual instrument anyway
 
+    def get_setpoints(self):
+        return self._setpoint
+
+    def set_setpoints(self, P, U, I):
+        self._setpoint = [P, U, I]
+
     @property
     def output(self):
         return self._status['outputON']
@@ -80,10 +86,11 @@ class ADLPowerSupply:
         return self._status
 
     def update_pui(self):
-        data = self.__send_command_and_read(3, (0, 0, 0, 0))
-        self._power = data[2]
-        self._voltage = data[0]
-        self._current = data[1]
+        if self._connected:
+            data = self.__send_command_and_read(3, (0, 0, 0, 0))
+            self._power = data[2]
+            self._voltage = data[0]
+            self._current = data[1]
         return self._power, self._voltage, self._current
 
     def update_status(self):
