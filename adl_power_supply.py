@@ -1,5 +1,6 @@
 import struct
 import pyvisa
+from pyvisa import constants as vc
 from crccheck.crc import Crc16Modbus
 
 
@@ -9,7 +10,7 @@ class ADLPowerSupply:
         self._address = 0
         self._mode = 0
         self._setpoint = [0, 0, 0]  # (P, U, I)
-        self._setpoint_max = (1000, 1000, 1000)  # (P, U, I)
+        self._setpoint_max = (2000, 1000, 3000)  # (P, U, I)
         self._mode_f_code = (11, 9, 10)  # function code for setting mode and setpoint (P, U, I)
         self._power = 0
         self._voltage = 0
@@ -65,8 +66,24 @@ class ADLPowerSupply:
     def get_setpoints(self):
         return self._setpoint
 
-    def set_setpoints(self, P, U, I):
-        self._setpoint = [P, U, I]
+    def set_mode_setpoint_passive(self, mode, value):
+        try:
+            int_mode = int(mode)
+        except ValueError:
+            raise ValueError('Mode value must be an integer')
+        if int_mode < 0 or int_mode > 2:
+            raise ValueError('Mode value must be between 0 and 2 (0 = P mode, 1 = U mode, 2 = I mode')
+        if int_mode == self._mode:  # if setting currently active mode
+            self.setpoint = value   # use setter to set the current mode setpoint and send to instrument
+        else:
+            try:  # check new value
+                int_value = int(value)
+            except ValueError:
+                raise ValueError('Setpoint value must be an integer')
+            if int_value < 0 or int_value > self._setpoint_max[int_mode]:
+                raise ValueError('Setpoint value must be between 0 and ' + str(self._setpoint_max[int_mode]))
+            self._setpoint[int_mode] = int_value  # change new setpoint for inactive mode in memory
+            # no data sent to instrument
 
     @property
     def output(self):
@@ -85,6 +102,10 @@ class ADLPowerSupply:
     def status(self):
         return self._status
 
+    @property
+    def connected(self):
+        return self._connected
+
     def update_pui(self):
         if self._connected:
             data = self.__send_command_and_read(3, (0, 0, 0, 0))
@@ -100,19 +121,30 @@ class ADLPowerSupply:
     def connect(self, visa_resource_id):
         rm = pyvisa.ResourceManager()
         # connect to a specific instrument
-        self._inst = rm.open_resource(visa_resource_id, open_timeout=1000,
-                                      resource_pyclass=pyvisa.resources.MessageBasedResource)
+        print(rm.list_resources())
+        self._inst = rm.open_resource(visa_resource_id, open_timeout=1000, chunk_size=16,
+                                      resource_pyclass=pyvisa.resources.SerialInstrument, baud_rate=9600,
+                                      data_bits=8, stop_bits=vc.StopBits.one, parity=vc.Parity.even)
         # instrument initialization
+        self._connected = True
+        self.mode = self._mode    # update mode to instrument, this also updates setpoint
+
+    def disconnect(self):
+        if self._output:
+            self.output = False  # stop output
+        self._inst.close()
+        self._connected = False
 
     # sends a command to the instrument: f_code = 1-byte function code,
     # par is a 4-tuple with 2-byte parameter values
     # reads the instrument response, status bytes are read and self._status is updated
     # any data read are returned in a 4-tuple
     def __send_command_and_read(self, f_code, par):
-        cmd = struct.pack('>BBHHHH', self._address, f_code, par[0], par[1], par[3], par[4])  # encode command
+        cmd = struct.pack('>BBHHHH', self._address, f_code, par[0], par[1], par[2], par[3])  # encode command
         crc = struct.pack('<H', Crc16Modbus.calc(cmd))  # calculate CRC checksum
-        msg = cmd + crc + struct.pack('B', 59)  # compose message and add terminating character
-        ret_msg = self._inst.query(msg)  # send msg and query for response
+        msg = cmd + crc + struct.pack('B', 59)  # compose message, checksum and termination character
+        self._inst.write_raw(msg)
+        ret_msg = self._inst.read_bytes(16)
         resp = ret_msg[0:13]           # extract response without CRC and termination character
         crc = struct.unpack('<H', ret_msg[13:15])[0]    # decode CRC
         crc_check = Crc16Modbus.calc(resp)      # calculate CRC from response

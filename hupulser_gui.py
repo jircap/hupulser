@@ -60,6 +60,7 @@ class MatplotlibPlot:
 
 class HuPulserGui:
     def __init__(self, master):
+        self._timer_interval = 100
         self.root = master
         master.title(":* pulsed power supply control")
         # **** init hardware objects ****
@@ -70,8 +71,9 @@ class HuPulserGui:
         self.config.read('hupulser.ini')
         try:
             self.ps1.mode = self.config['DC1']['mode']
-            self.ps1.set_setpoints(self.config['DC1']['setpoint_power'], self.config['DC1']['setpoint_voltage'],
-                                   self.config['DC1']['setpoint_current'])
+            self.ps1.set_mode_setpoint_passive(0, self.config['DC1']['setpoint_power'])
+            self.ps1.set_mode_setpoint_passive(1, self.config['DC1']['setpoint_voltage'])
+            self.ps1.set_mode_setpoint_passive(2, self.config['DC1']['setpoint_current'])
         except KeyError:  # key Pulser not found in config (no config present)
             messagebox.showinfo('Info', 'Config for DC1 not found')
         try:
@@ -101,8 +103,8 @@ class HuPulserGui:
         self.button_ps1_connect = tk.Button(ps1_connect_frame, text='Connect', command=self.ps1_connect,
                                             relief=tk.GROOVE)
         self.button_ps1_connect.grid(row=0, column=0, padx=5)
-        self.indicator_pulser_connected = Indicator(ps1_connect_frame, text='Connected')
-        self.indicator_pulser_connected.grid(row=0, column=1, columnspan=2, padx=5)
+        self.indicator_ps1_connected = Indicator(ps1_connect_frame, text='Connected')
+        self.indicator_ps1_connected.grid(row=0, column=1, columnspan=2, padx=5)
         # control mode
         ps1_mode_frame = tk.Frame(ps1_frame, background=self.root['bg'])
         ps1_mode_frame.pack()
@@ -134,6 +136,7 @@ class HuPulserGui:
         self.ps1_unit.set('W')
         label_ps1_setpoint_unit = tk.Label(ps1_values_frame, textvariable=self.ps1_unit)
         label_ps1_setpoint_unit.grid(row=0, column=2, padx=5, sticky='W')
+        self.ps1_mode_set()  # update unit label from current mode radiobutton setting
 
         label_ps1_power = tk.Label(ps1_values_frame, text='Power')
         label_ps1_power.grid(row=1, column=0, padx=5, pady=(5, 0), sticky='E')
@@ -275,15 +278,17 @@ class HuPulserGui:
                                    self.pulser.pos_pulse_length, self.pulser.get_period(), self.scale_plot.get())
 
         # register after callback
-        self.root.after(1000, self.timer)
+        self.root.after(self._timer_interval, self.timer)
 
+    # regular timer used to poll actual values from the DC power supply
+    # without regular interrogating, the ADL power supply automatically turns off
     def timer(self):
-        self.indicator_ps1_active.on = not self.indicator_ps1_active.on
-        power, voltage, current = self.ps1.update_pui()
+        power, voltage, current = self.ps1.update_pui()   # get actual values, this updates status
         self.label_ps1_power.config(text=str(power))
         self.label_ps1_voltage.config(text=str(voltage))
         self.label_ps1_current.config(text=str(current))
-        self.root.after(1000, self.timer)
+        self.ps1_update_status_indicators()    # show actual status by indicators
+        self.root.after(self._timer_interval, self.timer)
 
     def ps1_mode_set(self):
         new_mode = self.ps1_mode.get()  # get value from radiobuttons
@@ -416,4 +421,17 @@ class HuPulserGui:
             self.pulser.disconnect()
 
     def ps1_connect(self):
-        return
+        if not self.ps1.connected:
+            try:
+                self.ps1.connect('ASRL2::INSTR')
+            except ValueError as e:
+                messagebox.showerror('Error', 'Connection to ADL power supply failed\n\n' + str(e))
+            finally:
+                self.indicator_ps1_connected.on = self.ps1.connected
+                if self.ps1.connected:
+                    self.ps1_update_status_indicators()
+        else:  # if connected -> disconnect
+            self.ps1.output = False
+            self.ps1_update_status_indicators()
+            self.ps1.disconnect()
+            self.indicator_ps1_connected.on = self.ps1.connected
