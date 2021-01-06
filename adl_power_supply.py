@@ -18,11 +18,10 @@ class ADLPowerSupply:
         self._output = 0
         self._connected = False
         self._inst = None
-        self._status = {'activeToggle': False, 'interlock': True, 'remote': True, 'setpointOK': True, 'mainsON': False,
+        self._status = {'activeToggle': False, 'interlock': False, 'remote': True, 'setpointOK': True, 'mainsON': False,
                         'outputON': False, 'plasmaON': False, 'modeP': True, 'modeU': False, 'modeI': False,
                         'ramp': False, 'jouleMode': False, 'jouleLimit': False, 'pulseON': False, 'error': False,
                         'commandError': False, 'watchdogError': False, 'commandErrorCode': 0}
-        # msg = b'\x00\x0b\x1d\x01\x00\x3a\x98\x00\x00\x00\x00\x00\x00\x42\x3b\x0d'
 
     @property
     def mode(self):
@@ -42,7 +41,7 @@ class ADLPowerSupply:
                                          (self._setpoint[int_value], 0, 0, 0))
             if (int_value == 0 and not self._status['modeP']) or (int_value == 1 and not self._status['modeU']) or \
                     (int_value == 2 and not self._status['modeI']):
-                raise ValueError('Setpoint readback does not match sent value')
+                raise ValueError('Mode in status does not match required mode')
         self._mode = int_value
 
     @property
@@ -118,16 +117,20 @@ class ADLPowerSupply:
         self.__send_command_and_read(13, (0, 0, 0, 0))  # command to read status
         # reads only status bytes, no additional data
 
-    def connect(self, visa_resource_id):
+    def connect(self, visa_resource_id, baud):
         rm = pyvisa.ResourceManager()
         # connect to a specific instrument
-        print(rm.list_resources())
         self._inst = rm.open_resource(visa_resource_id, open_timeout=1000, chunk_size=16,
-                                      resource_pyclass=pyvisa.resources.SerialInstrument, baud_rate=9600,
+                                      resource_pyclass=pyvisa.resources.SerialInstrument, baud_rate=baud,
                                       data_bits=8, stop_bits=vc.StopBits.one, parity=vc.Parity.even)
         # instrument initialization
-        self._connected = True
-        self.mode = self._mode    # update mode to instrument, this also updates setpoint
+        self._connected = True  # this has to be set to True for the next functions to try send date to the instrument
+        try:
+            self.mode = self._mode    # update mode to instrument, this also updates setpoint
+            # if any communication error is detected, typically timeout when the instrument does not respond
+        except Exception as e:
+            self._connected = False  # set connected to False
+            raise e    # re-raise exception to be processed in the main code, typically and error dialog will be shown
 
     def disconnect(self):
         if self._output:
@@ -143,15 +146,15 @@ class ADLPowerSupply:
         cmd = struct.pack('>BBHHHH', self._address, f_code, par[0], par[1], par[2], par[3])  # encode command
         crc = struct.pack('<H', Crc16Modbus.calc(cmd))  # calculate CRC checksum
         msg = cmd + crc + struct.pack('B', 59)  # compose message, checksum and termination character
-        self._inst.write_raw(msg)
-        ret_msg = self._inst.read_bytes(16)
+        self._inst.write_raw(msg)   # send command in raw format
+        ret_msg = self._inst.read_bytes(16)   # read fixed number of bytes in raw format
         resp = ret_msg[0:13]           # extract response without CRC and termination character
-        crc = struct.unpack('<H', ret_msg[13:15])[0]    # decode CRC
-        crc_check = Crc16Modbus.calc(resp)      # calculate CRC from response
+        crc = struct.unpack('<H', ret_msg[13:15])[0]    # extract checksum
+        crc_check = Crc16Modbus.calc(resp)      # calculate checksum from response
         if crc == crc_check:  # CRC OK
             resp_decoded = struct.unpack('>BBBBBHHHH', resp)    # decode response into bytes and shorts
-            address = resp_decoded[0]
-            function = resp_decoded[1]
+            # address = resp_decoded[0]
+            # function = resp_decoded[1]
             self._status['activeToggle'] = bool(resp_decoded[2] & 1)
             self._status['interlock'] = bool(resp_decoded[2] & 2)
             self._status['remote'] = bool(resp_decoded[2] & 4)
@@ -175,4 +178,3 @@ class ADLPowerSupply:
             return data
         else:  # CRC does not match
             raise ValueError("CRC mismatch for received message")
-
