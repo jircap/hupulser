@@ -120,7 +120,7 @@ class ADLPowerSupply:
     def connect(self, visa_resource_id, baud):
         rm = pyvisa.ResourceManager()
         # connect to a specific instrument
-        self._inst = rm.open_resource(visa_resource_id, open_timeout=1000, chunk_size=16,
+        self._inst = rm.open_resource(visa_resource_id, open_timeout=1000, timeout=100, chunk_size=16,
                                       resource_pyclass=pyvisa.resources.SerialInstrument, baud_rate=baud,
                                       data_bits=8, stop_bits=vc.StopBits.one, parity=vc.Parity.even)
         # instrument initialization

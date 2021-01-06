@@ -281,13 +281,24 @@ class HuPulserGui:
         except KeyError:  # key Pulser not found in config (no config present)
             self.config['DC1'].update({'update_interval': '500'})
             self.root.after(self.config['DC1']['update_interval'], self.ps1_periodic_update)
-            messagebox.showinfo('Warning', 'Update interval not found in DC1 ini file. Using 500 ms.')
+            messagebox.showwarning('Warning', 'Update interval not found in DC1 ini file. Using 500 ms.')
 
     # connect or disconnect DC1 power supply
     def ps1_connect(self):
         if not self.ps1.connected:
             try:
-                self.ps1.connect(self.config['DC1']['resource_id'], self.config['DC1']['baud_rate'])
+                try:
+                    baud_rate = int(self.config['DC1']['baud_rate'])
+                    if baud_rate not in [9600, 19200, 57600, 115200, 921600]:
+                        baud_rate = 9600
+                        messagebox.showwarning('Warning', 'Incompatible baud rate, must be one of the following:\n'
+                                                          '9600, 19200, 57600, 115200 or 921600 (RS-485 only).\n'
+                                                          'Using baud rate of 9600.')
+                except ValueError:
+                    messagebox.showwarning('Warning', 'Baud rate must be an integer. Using baud rate of 9600.')
+                    baud_rate = 9600
+
+                self.ps1.connect(self.config['DC1']['resource_id'], baud=baud_rate)
             except Exception as e:
                 messagebox.showerror('Error', 'Connection to ADL power supply failed\n\n' + str(e))
             finally:
