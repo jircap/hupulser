@@ -214,54 +214,27 @@ class HuPulserGui:
         label_pulser_frequency_units = tk.Label(pulser_frame, text="Hz", background=self.root['bg'])
         label_pulser_frequency_units.grid(row=2, column=2, padx=5, pady=(5, 0), sticky='W')
 
-        label_channel1 = tk.Label(pulser_frame, text="Channel 1", background=self.root['bg'])
+        label_channel1 = tk.Label(pulser_frame, text="Pulse shape", background=self.root['bg'])
         label_channel1.grid(row=3, column=0, padx=5, pady=(5, 0), sticky='E')
 
-        label_t_on_neg = tk.Label(pulser_frame, text=u'T\u2092\u2099\u207B', background=self.root['bg'])
-        label_t_on_neg.grid(row=4, column=0, padx=5, sticky='E')
-        self.entry_t_on_neg = tk.Entry(pulser_frame, width=10, justify=tk.RIGHT)
-        self.entry_t_on_neg.inst_property = RigolDG4102Pulser.neg_pulse_length
-        self.entry_t_on_neg.bind("<Return>", self.pulser_entry_confirmed)
-        self.entry_t_on_neg.bind("<FocusOut>", self.pulser_entry_modified)
-        self.entry_t_on_neg.grid(row=4, column=1, padx=5, sticky='E')
-        self.entry_t_on_neg.insert(0, self.pulser.neg_pulse_length)
-        label_t_on_neg_units = tk.Label(pulser_frame, text=u'\u00B5s', background=self.root['bg'])
-        label_t_on_neg_units.grid(row=4, column=2, padx=5, sticky='W')
+        self.text_pulser_shape = tk.Text(pulser_frame, width=10, height=6, font='TkDefaultFont')
+        self.text_pulser_shape.grid(row=3, column=1, padx=5, pady=(5, 0), sticky='E')
+        label_pulser_shape_units = tk.Label(pulser_frame, text="us", background=self.root['bg'])
+        label_pulser_shape_units.grid(row=3, column=2, padx=5, pady=(5, 0), sticky='W')
+        self.button_pulser_set_shape = tk.Button(pulser_frame, text="Set shape", relief=tk.GROOVE,
+                                                 command=self.pulser_toggle_output)
+        self.button_pulser_set_shape.grid(row=4, column=1, padx=5, pady=(5, 0))
 
-        label_channel2 = tk.Label(pulser_frame, text="Channel 2", background=self.root['bg'])
-        label_channel2.grid(row=5, column=0, padx=5, pady=(5, 0), sticky='E')
-        self.toggleButton_pulser_activate_ch2 = ToggleButton(pulser_frame, text="Enable",
+        self.toggleButton_pulser_activate_ch2 = ToggleButton(pulser_frame, text="Enable channel 2",
                                                              command=self.pulser_activate_ch2, ind_height=12)
-        self.toggleButton_pulser_activate_ch2.grid(row=5, column=1, padx=5, pady=(5, 0))
+        self.toggleButton_pulser_activate_ch2.grid(row=5, column=0, columnspan=2, padx=5, pady=(5, 0))
         self.toggleButton_pulser_activate_ch2.on = self.pulser.ch2_enabled
 
-        label_delay_pulse_pos = tk.Label(pulser_frame, text='Delay', background=self.root['bg'])
-        label_delay_pulse_pos.grid(row=6, column=0, padx=5, sticky='E')
-        self.entry_delay_pulse_pos = tk.Entry(pulser_frame, width=10, justify=tk.RIGHT)
-        self.entry_delay_pulse_pos.inst_property = RigolDG4102Pulser.pos_pulse_delay
-        self.entry_delay_pulse_pos.bind("<Return>", self.pulser_entry_confirmed)
-        self.entry_delay_pulse_pos.bind("<FocusOut>", self.pulser_entry_modified)
-        self.entry_delay_pulse_pos.grid(row=6, column=1, padx=5, sticky='E')
-        self.entry_delay_pulse_pos.insert(0, self.pulser.pos_pulse_delay)
-        label_delay_pulse_pos_units = tk.Label(pulser_frame, text=u'\u00B5s', background=self.root['bg'])
-        label_delay_pulse_pos_units.grid(row=6, column=2, padx=5, sticky='W')
-
-        label_t_on_pos = tk.Label(pulser_frame, text=u'T\u2092\u2099\u207A', background=self.root['bg'])
-        label_t_on_pos.grid(row=7, column=0, padx=5, sticky='E')
-        self.entry_t_on_pos = tk.Entry(pulser_frame, width=10, justify=tk.RIGHT)
-        self.entry_t_on_pos.inst_property = RigolDG4102Pulser.pos_pulse_length
-        self.entry_t_on_pos.bind("<FocusOut>", self.pulser_entry_modified)
-        self.entry_t_on_pos.bind("<Return>", self.pulser_entry_confirmed)
-        self.entry_t_on_pos.grid(row=7, column=1, padx=5, sticky='E')
-        self.entry_t_on_pos.insert(0, self.pulser.pos_pulse_length)
-        label_t_on_pos_units = tk.Label(pulser_frame, text=u'\u00B5s', background=self.root['bg'])
-        label_t_on_pos_units.grid(row=7, column=2, padx=5, sticky='W')
-
         self.indicator_pulser_ch1_output = Indicator(pulser_frame, 'Channel 1 output')
-        self.indicator_pulser_ch1_output.grid(row=8, column=0, columnspan=2, padx=5)
+        self.indicator_pulser_ch1_output.grid(row=6, column=0, columnspan=2, padx=5)
 
         self.indicator_pulser_ch2_output = Indicator(pulser_frame, 'Channel 2 output')
-        self.indicator_pulser_ch2_output.grid(row=9, column=0, columnspan=2, padx=5)
+        self.indicator_pulser_ch2_output.grid(row=7, column=0, columnspan=2, padx=5)
 
         plot_frame = tk.LabelFrame(main_frame, background=self.root['bg'], borderwidth=2, relief=tk.RIDGE,
                                    text='  PLOT  ')
@@ -274,7 +247,7 @@ class HuPulserGui:
         self.m_plot.plot_waveforms(self.pulser.ch2_enabled, self.pulser.neg_pulse_length, self.pulser.pos_pulse_delay,
                                    self.pulser.pos_pulse_length, self.pulser.get_period(), self.scale_plot.get())
 
-        self.pulser_activate_ch2()  # call the pushbutton callback to enable/disable entry fields accordingly
+#         self.pulser_activate_ch2()  # call the pushbutton callback to enable/disable entry fields accordingly
         # register after callback
         try:
             self.root.after(self.config['DC1']['update_interval'], self.ps1_periodic_update)
@@ -413,13 +386,36 @@ class HuPulserGui:
             self.entry_t_on_pos.config(state=tk.NORMAL)
             self.entry_delay_pulse_pos.config(state=tk.NORMAL)
             self.pulser.ch2_enabled = True
-            self.plot_data()
         else:
             self.entry_t_on_pos.config(state=tk.DISABLED)
             self.entry_delay_pulse_pos.config(state=tk.DISABLED)
             self.pulser.ch2_enabled = False
-            self.plot_data()
+        self.plot_data()
         self.indicator_pulser_ch2_output.on = self.pulser.output and self.pulser.ch2_enabled
+
+    def pulser_arb_pulse(self):
+        if self.toggleButton_pulser_arb_pulse.on:
+            self.entry_t_on_neg.config(state=tk.DISABLED)
+            self.entry_t_on_pos.config(state=tk.DISABLED)
+            self.entry_delay_pulse_pos.config(state=tk.DISABLED)
+            # load pulse train
+
+        else:
+            self.entry_t_on_neg.config(state=tk.NORMAL)
+            if self.toggleButton_pulser_activate_ch2.on:
+                self.entry_t_on_pos.config(state=tk.NORMAL)
+                self.entry_delay_pulse_pos.config(state=tk.NORMAL)
+            self.pulser.set_all(self.entry_pulser_frequency.get(),
+                                self.entry_t_on_neg.get(),
+                                self.entry_delay_pulse_pos.get(),
+                                self.entry_t_on_pos.get(),
+                                self.toggleButton_pulser_activate_ch2)
+        self.plot_data()
+
+    def pulser_reload(self):
+        if self.toggleButton_pulser_arb_pulse.on:
+
+            self.plot_data()
 
     def pulser_toggle_output(self):
         self.pulser.output = not self.pulser.output
