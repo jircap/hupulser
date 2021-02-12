@@ -1,16 +1,22 @@
 import numpy as np
 import pyvisa
-import time
+import time as time_module
 
 
 class RigolDG4102Pulser:
     def __init__(self):
+        self._num_wf_points = 16384
         self._amplitude = 3.7  # both channels have fixed amplitude 3.7 V
         self._frequency_coefficient_ch2 = 1.01
         self._connected = False
         self._output = False
         self._ch2_enabled = False
         self._frequency = 10
+        # or num_points-1 (how is interpolation done?)
+        self._pulse_shape = []
+        self._ch1_waveform = np.zeros(self._num_wf_points, dtype=int)
+        self._ch2_waveform = np.zeros(self._num_wf_points, dtype=int)
+        self.pulse_shape = ['100-']   # set default pulse shape, trigger setter function
         self._neg_pulse_length = 100
         self._pos_pulse_delay = 10
         self._pos_pulse_length = 20
@@ -96,105 +102,93 @@ class RigolDG4102Pulser:
             raise ValueError('Frequency input must be an integer')
         if int_value > 10000:
             raise ValueError('Frequency input must be lower than 10 kHz')
-        if self._neg_pulse_length + self._pos_pulse_delay + self._pos_pulse_length >= int(1e6 / int_value):
-            period = int(1e6 / self._frequency)
-            raise ValueError(u'T\u2092\u2099\u207B + delay + T\u2092\u2099\u207A needs to be lower than the period'
-                             + u' time (' + str(period) + '\u00B5s)')
         if int_value != self._frequency:  # do something only if frequency is changed
             self._frequency = int_value
+            # adapt pulse shape
+            self.__parse_pulse_shape(self._pulse_shape)   # use actual pulse shape to update waveforms based on
+            # new frequency
             if self._connected:
                 is_pulsing = self._output  # save if the pulser is active
                 if is_pulsing:
                     self.output = False  # turn of the output before frequency is changed
-                    time.sleep(0.1)
+                    time_module.sleep(0.1)
                 self.__cmd_frequency()  # update frequency in instrument
-                time.sleep(0.1)
+                time_module.sleep(0.1)
                 self.__cmd_pulse_shape(1)  # update pulse shape which depends on frequency
                 self.__cmd_negative_pulse_modulation()  # needs to be started again with every change of the pulse shape
                 if self._ch2_enabled:  # update pulse shape for positive pulse if active
                     self.__cmd_pulse_shape(2)
                     self.__cmd_positive_pulse_synchronization()  # likely needs to be started again as well
-                time.sleep(0.1)
+                time_module.sleep(0.1)
                 if is_pulsing:
                     self.output = True  # turn output on again
 
     @property
-    def neg_pulse_length(self):
-        return self._neg_pulse_length
+    def pulse_shape(self):
+        return self._pulse_shape
 
-    @neg_pulse_length.setter
-    def neg_pulse_length(self, value):
-        try:
-            int_value = int(value)
-        except ValueError:
-            raise ValueError('Pulse length input must be an integer')
-        if int_value < 5:
-            raise ValueError('Pulse length input must be at least 5 us')
-        if int_value + self._pos_pulse_delay + self._pos_pulse_length >= int(1e6 / self._frequency):
-            period = int(1e6 / self._frequency)
-            raise ValueError(u'T\u2092\u2099\u207B + delay + T\u2092\u2099\u207A needs to be lower than the period'
-                             + u' time (' + str(period) + '\u00B5s)')
-        if int_value != self._neg_pulse_length:
-            self._neg_pulse_length = int_value  # update the value
-            if self._connected:
-                if self._output and self._ch2_enabled:  # if pulsing and ch2 enabled
-                    self.__cmd_channel_state(2, False)  # turn off channel 2 while changing negative pulse length
-                    time.sleep(0.1)  # wait some time
-                self.__cmd_pulse_shape(1)  # update pulse shape
-                self.__cmd_negative_pulse_modulation()  # needs to be started again with every change of the pulse shape
-                if self._ch2_enabled:  # update pulse shape for positive pulse if active
-                    self.__cmd_pulse_shape(2)
-                    self.__cmd_positive_pulse_synchronization()
-                time.sleep(0.1)
-                if self._ch2_enabled:
-                    self.__cmd_channel_state(2, True)  # turn channel 2 on again
+    # parse pulse shape string, check validity, depends on actual frequency
+    # updates channel 1 and 2 waveforms
+    def __parse_pulse_shape(self, shape):
+        # check pulse shape string validity
+        dt = 1e6 / (self._frequency * self._num_wf_points)
+        time_step = [0]  # time in dt steps
+        polarity = [0]
+        for s in shape:
+            if s[-1] == '-':  # negative pulse
+                polarity.append(-1)
+                s1 = s[:-1]
+            elif s[-1] == '+':  # positive pulse
+                polarity.append(1)
+                s1 = s[:-1]
+            else:  # delay
+                polarity.append(0)
+                s1 = s
+            try:
+                value = float(s1)
+            except ValueError:
+                raise ValueError('Invalid value of pulse length in ' + s)
+            if value < dt:
+                raise ValueError('Pulse length is shorter than minimal step (' + str(dt) +
+                                 ') determined by given frequency')
+            value_step = round(value / dt)  # divide by dt and round
+            if value_step * dt < 5.:  # interval shorter than 5 us not allowed to ensure power supply is safe
+                raise ValueError('Pulse or delay length must be longer than 5 us')
+            time_step.append(time_step[-1] + value_step)
+        if time_step[-1] >= self._num_wf_points:
+            raise ValueError('Total pulse length must shorter than pulse period')
+        # set channel waveforms
+        self._ch1_waveform.fill(0)  # set all zeros
+        self._ch2_waveform.fill(0)
+        for i in range(1, len(time_step)):  # go through prepared list of intervals, from 2nd to last
+            if polarity[i] == -1:
+                self._ch1_waveform[time_step[i - 1]:time_step[i]] = 1
+            elif polarity[i] == 1:
+                self._ch2_waveform[time_step[i - 1]:time_step[i]] = 1
 
-    @property
-    def pos_pulse_delay(self):
-        return self._pos_pulse_delay
+    @pulse_shape.setter
+    def pulse_shape(self, shape):
+        self.__parse_pulse_shape(shape)
+        self._pulse_shape = shape    # update shape string
+        if self._connected:  # send commands to instrument
+            if self._output and self._ch2_enabled:  # if pulsing and ch2 enabled
+                self.__cmd_channel_state(2, False)  # turn off channel 2 while changing negative pulse length
+                time_module.sleep(0.1)  # wait some time
+            self.__cmd_pulse_shape(1)
+            self.__cmd_negative_pulse_modulation()  # needs to be started again with every change of the pulse shape
+            self.__cmd_pulse_shape(2)
+            self.__cmd_positive_pulse_synchronization()
+            time_module.sleep(0.1)
+            if self._output and self._ch2_enabled:
+                self.__cmd_channel_state(2, True)  # turn channel 2 on again
 
-    @pos_pulse_delay.setter
-    def pos_pulse_delay(self, value):
-        try:
-            int_value = int(value)
-        except ValueError:
-            raise ValueError('Pulse delay input must be an integer')
-        if int_value < 5:
-            raise ValueError('Pulse delay input must be at least 5 us')
-        if self._neg_pulse_length + int_value + self._pos_pulse_length >= int(1e6 / self._frequency):
-            period = int(1e6 / self._frequency)
-            raise ValueError(u'T\u2092\u2099\u207B + delay + T\u2092\u2099\u207A needs to be lower than the period'
-                             + u' time (' + str(period) + '\u00B5s)')
-        if int_value != self._pos_pulse_delay:
-            self._pos_pulse_delay = int_value  # update the value
-            if self._connected:
-                self.__cmd_pulse_shape(2)
-                self.__cmd_positive_pulse_synchronization()
-
-    @property
-    def pos_pulse_length(self):
-        return self._pos_pulse_length
-
-    @pos_pulse_length.setter
-    def pos_pulse_length(self, value):
-        try:
-            int_value = int(value)
-        except ValueError:
-            raise ValueError('Pulse length input must be an integer')
-        if int_value < 5:
-            raise ValueError('Pulse length input must be at least 5 us')
-        if self._neg_pulse_length + self._pos_pulse_delay + int_value >= int(1e6 / self._frequency):
-            period = int(1e6 / self._frequency)
-            raise ValueError(u'T\u2092\u2099\u207B + delay + T\u2092\u2099\u207A needs to be lower than the period'
-                             + u' time (' + str(period) + '\u00B5s)')
-        if int_value != self._pos_pulse_length:
-            self._pos_pulse_length = int_value  # update the value
-            if self._connected:
-                self.__cmd_pulse_shape(2)
-                self.__cmd_positive_pulse_synchronization()
+    def get_waveforms(self):
+        dt = 1e6/(self._frequency*self._num_wf_points)
+        t = np.arange(0, self._num_wf_points)*dt
+        return t, self._ch1_waveform, self._ch2_waveform
 
     def get_period(self):
-        return int(1e6 / self._frequency)
+        return 1e6 / self._frequency
 
     def __cmd_channel_state(self, channel, value):
         str_value = 'ON' if value else 'OFF'
@@ -212,59 +206,6 @@ class RigolDG4102Pulser:
                          ',' + str(2 * self._amplitude) + ',0,0')  # channel 1
         self._inst.write(':SOURce2:APPLy:CUSTom ' + str(self._frequency * self._frequency_coefficient_ch2) +
                          ',' + str(2 * self._amplitude) + ',0,0')  # channel 2, increase by 1 percent, see coefficient
-
-    def set_all(self, frequency, neg_ton, pos_delay, pos_ton, ch2_enabled):
-        try:
-            int_frequency = int(frequency)
-        except ValueError:
-            raise ValueError('Frequency input must be an integer')
-        if int_frequency > 10000:
-            raise ValueError('Frequency input must be lower than 10 kHz')
-        try:
-            int_neg_ton = int(neg_ton)
-        except ValueError:
-            raise ValueError('Pulse length input must be an integer')
-        if int_neg_ton < 5:
-            raise ValueError('Pulse length input must be at least 5 us')
-        try:
-            int_pos_ton = int(pos_ton)
-        except ValueError:
-            raise ValueError('Pulse length input must be an integer')
-        if int_pos_ton < 5:
-            raise ValueError('Pulse length input must be at least 5 us')
-        try:
-            int_pos_delay = int(pos_delay)
-        except ValueError:
-            raise ValueError('Pulse delay input must be an integer')
-        if int_pos_delay < 5:
-            raise ValueError('Pulse delay input must be at least 5 us')
-        if int_neg_ton + int_pos_delay + int_pos_ton >= int(1e6 / int_frequency):
-            period = int(1e6 / self._frequency)
-            raise ValueError(u'T\u2092\u2099\u207B + delay + T\u2092\u2099\u207A needs to be lower than the period'
-                             + u' time (' + str(period) + '\u00B5s)')
-        self._frequency = int_frequency
-        self._neg_pulse_length = int_neg_ton
-        self._pos_pulse_delay = int_pos_delay
-        self._pos_pulse_length = int_pos_delay
-        if isinstance(ch2_enabled, bool):  # check that input is boolean
-            self._ch2_enabled = ch2_enabled
-        else:
-            self._ch2_enabled = ch2_enabled == 'True'
-        if self._connected:
-            is_pulsing = self._output  # save if the pulser is active
-            if is_pulsing:
-                self.output = False  # turn of the output before frequency is changed
-                time.sleep(0.1)
-            self.__cmd_frequency()  # update frequency in instrument
-            time.sleep(0.1)
-            self.__cmd_pulse_shape(1)  # update pulse shape which depends on frequency
-            self.__cmd_negative_pulse_modulation()  # needs to be started again with every change of the pulse shape
-            if self._ch2_enabled:  # update pulse shape for positive pulse if active
-                self.__cmd_pulse_shape(2)
-                self.__cmd_positive_pulse_synchronization()  # likely needs to be started again as well
-            time.sleep(0.1)
-            if is_pulsing:
-                self.output = True  # turn output on again
 
     # send commands to enable negative pulse modulation for arc detection
     def __cmd_negative_pulse_modulation(self):
@@ -290,23 +231,11 @@ class RigolDG4102Pulser:
 
     # send command describing the shape of the pulse for the given channel
     def __cmd_pulse_shape(self, channel):
-        # channel - channel number (1 or 2)
-        period = 1e6 / self._frequency  # period
-        if channel == 1:  # set pulse length and delay from class properties depending on channel number
-            t_on = self._neg_pulse_length
-            delay = 0
+        if channel == 1:
+            wf_str = ", ".join(map(str, self._ch1_waveform))  # convert "pos_pulse_shape" to a string with values
+            # delimited by ","
+        elif channel == 2:
+            wf_str = ", ".join(map(str, self._ch2_waveform))
         else:
-            t_on = self._pos_pulse_length
-            delay = self._pos_pulse_delay
-
-        number_of_points = 16384  # number of points describing the pulse shape during the period
-        # (16384 is the maximum value)
-        pulse = np.zeros(number_of_points)  # set the initial array for the description of the pulse shape
-        # during the period (all values are "0")
-        t_on_in_points = int(t_on / period * number_of_points)  # calculate the number of points
-        # corresponding to the negative pulse
-        delay_in_points = int(delay / period * number_of_points)  # calculate the number of points
-        # corresponding to the delay of the pulse
-        pulse[delay_in_points:delay_in_points + t_on_in_points] = 1  # set pulse to 1 for times inside the pulse
-        pulse_str = ", ".join(map(str, pulse))  # convert "pos_pulse_shape" to a string with values deliminated by ","
-        self._inst.write(':SOURce' + str(channel) + ':TRACE:DATA VOLATILE,' + pulse_str)  # send to shape data
+            return
+        self._inst.write(':SOURce'+str(channel)+':TRACE:DATA VOLATILE,' + wf_str)  # send shape data
