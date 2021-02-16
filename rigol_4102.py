@@ -204,7 +204,11 @@ class RigolDG4102Pulser:
         # amplitude must be multiplied by 2
         self._inst.write(':SOURce1:APPLy:CUSTom ' + str(self._frequency) +
                          ',' + str(2 * self._amplitude) + ',0,0')  # channel 1
-        self._inst.write(':SOURce2:APPLy:CUSTom ' + str(self._frequency * self._frequency_coefficient_ch2) +
+        freq2 = 1/(1/self._frequency-1e-6)   # decrease period by 1us to ensure there us no overlap with next pulse
+        freq2_str = '{:.4f}'.format(freq2)   # format string to necessary precision
+        #self._inst.write(':SOURce2:APPLy:CUSTom ' + str(self._frequency * self._frequency_coefficient_ch2) +
+        #                 ',' + str(2 * self._amplitude) + ',0,0')  # channel 2, increase by 1 percent, see coefficient
+        self._inst.write(':SOURce2:APPLy:CUSTom ' + freq2_str +
                          ',' + str(2 * self._amplitude) + ',0,0')  # channel 2, increase by 1 percent, see coefficient
 
     # send commands to enable negative pulse modulation for arc detection
@@ -225,7 +229,7 @@ class RigolDG4102Pulser:
         self._inst.write(":SOURce2:BURSt:TRIGger:SOURce EXTernal")  # set the external trigger
         self._inst.write(":SOURce2:BURSt:GATE:POLarity NORMal")  # start the trigger when there is a change from
         # the "high" level
-        self._inst.write(":SOURce2:BURSt:TRIGger:SLOP NEG")  # start the trigger when falling signal
+        self._inst.write(":SOURce2:BURSt:TRIGger:SLOP POS")  # start the trigger when falling signal
         # (end of the positive pulse)
         # self.inst.write(":SOURce2:BURSt:INTernal:PERiod 0.0001")
 
