@@ -1,4 +1,5 @@
 import numpy as np
+from math import ceil
 import pyvisa
 import time as time_module
 
@@ -152,6 +153,8 @@ class RigolDG4102Pulser:
                 raise ValueError('Pulse length is shorter than minimal step (' + str(dt) +
                                  ') determined by given frequency')
             value_step = round(value / dt)  # divide by dt and round
+            if value_step * dt < 5.:  # if lower than 5 us (limit), try rounding up
+                value_step = ceil(value / dt)  # divide by dt and round
             if value_step * dt < 5.:  # interval shorter than 5 us not allowed to ensure power supply is safe
                 raise ValueError('Pulse or delay length must be longer than 5 us')
             time_step.append(time_step[-1] + value_step)

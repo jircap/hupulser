@@ -286,7 +286,7 @@ class HuPulserGui:
         else:
             self.ps1_unit.set('')
 
-    def ps1_setpoint_modified(self):
+    def ps1_setpoint_modified(self, event):
         # check if new value is different from instrument value
         try:
             new_value = int(self.entry_ps1_setpoint.get())
@@ -297,7 +297,7 @@ class HuPulserGui:
         except ValueError:
             self.entry_ps1_setpoint.config(fg='red')
 
-    def ps1_setpoint_confirmed(self):
+    def ps1_setpoint_confirmed(self, event):
         try:
             self.ps1.setpoint = self.entry_ps1_setpoint.get()
             self.entry_ps1_setpoint.config(fg='black')

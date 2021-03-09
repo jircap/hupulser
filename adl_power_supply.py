@@ -146,8 +146,11 @@ class ADLPowerSupply:
         cmd = struct.pack('>BBHHHH', self._address, f_code, par[0], par[1], par[2], par[3])  # encode command
         crc = struct.pack('<H', Crc16Modbus.calc(cmd))  # calculate CRC checksum
         msg = cmd + crc + struct.pack('B', 59)  # compose message, checksum and termination character
-        self._inst.write_raw(msg)   # send command in raw format
-        ret_msg = self._inst.read_bytes(16)   # read fixed number of bytes in raw format
+        try:
+            self._inst.write_raw(msg)   # send command in raw format
+            ret_msg = self._inst.read_bytes(16)   # read fixed number of bytes in raw format
+        except Exception as e:
+            print('Caught error during VISA I/O')
         resp = ret_msg[0:13]           # extract response without CRC and termination character
         crc = struct.unpack('<H', ret_msg[13:15])[0]    # extract checksum
         crc_check = Crc16Modbus.calc(resp)      # calculate checksum from response
