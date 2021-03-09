@@ -197,6 +197,10 @@ class HuPulserGui:
             self.text_pulser_shape.insert(tk.INSERT, s + '\n')  # fill text by actual value from pulser
         label_pulser_shape_units = tk.Label(pulser_frame, text="\u00B5s", background=self.root['bg'])
         label_pulser_shape_units.grid(row=3, column=2, padx=5, pady=(5, 0), sticky='W')
+
+        self.scrollbar_pulser_shape = tk.Scrollbar(pulser_frame, command=self.text_pulser_shape.yview)
+        self.scrollbar_pulser_shape.grid(row=3, column=1, padx=5, pady=(5, 0), sticky='NSE')
+        self.text_pulser_shape['yscrollcommand'] = self.scrollbar_pulser_shape.set
         self.button_pulser_set_shape = tk.Button(pulser_frame, text="Set shape", relief=tk.GROOVE,
                                                  command=self.pulser_shape)
         self.button_pulser_set_shape.grid(row=4, column=1, padx=5, pady=(5, 0))
@@ -225,6 +229,11 @@ class HuPulserGui:
                                    self.scale_plot.get())
 
 #         self.pulser_activate_ch2()  # call the pushbutton callback to enable/disable entry fields accordingly
+
+        for s in self.config['Pulser']:   # look for preset pulse shapes
+            if s[0:6] == 'preset':  # if preset found
+                key = s[7:9]        # decode key from preset string
+                self.root.bind_all("<{:s}>".format(key).upper(), self.special_key_press)  # register key callback
         # register after callback
         try:
             self.root.after(self.config['DC1']['update_interval'], self.ps1_periodic_update)
@@ -232,6 +241,11 @@ class HuPulserGui:
             self.config['DC1'].update({'update_interval': '500'})
             self.root.after(self.config['DC1']['update_interval'], self.ps1_periodic_update)
             messagebox.showwarning('Warning', 'Update interval not found in DC1 ini file. Using 500 ms.')
+
+    def special_key_press(self, event):
+        self.text_pulser_shape.delete('1.0', 'end')
+        for s in self.config['Pulser']['preset_{:s}'.format(event.keysym).lower()].split(','):
+            self.text_pulser_shape.insert(tk.INSERT, s + '\n')  # fill text by actual value from pulser
 
     # connect or disconnect DC1 power supply
     def ps1_connect(self):
