@@ -11,24 +11,24 @@ from tkinter import messagebox
 class ItechIT6726VPowerSupply:
     def __init__(self):
         self._mode = 1  # first mode after start is Power mode
-        self._setpoint = [0.0, 0.0, 0.0]  # (U, P, I)
+        self._setpoints = [0.0, 0.0, 0.0]  # (U, P, I)
         self._setpoint_max = (3000, 1200, 5000)  # max U, P, I according to power supply
         self._output = 0    # no output voltage after start
         self._connected = False     # connection with PS
         self._inst = None   # representation of the PS for read/write commands
         self._status = {'outputON': False}
         self._thread = None
-        self.config = configparser.ConfigParser()
-        self.config.read('hupulser.ini')    # read file with initial settings
+        self._config = configparser.ConfigParser()
+        self._config.read('hupulser.ini')    # read file with initial settings
         try:
             # number of values in the buffer; used for storing the data and for plotting
-            self._buffer_no_elements = int(self.config['DC1']['buffer_size'])
+            self._buffer_no_elements = int(self._config['DC1']['buffer_size'])
         except KeyError:
             messagebox.showinfo('Info', 'Size of buffer not found in ini file. Taking standard value of 10 values.')
             self._buffer_no_elements = 10
         try:
             # number of last values used for a filter (average value) to determine mode
-            self._mode_determination_no_of_values = int(self.config['DC1']['mode_determination_no_of_values'])
+            self._mode_determination_no_of_values = int(self._config['DC1']['mode_determination_no_of_values'])
         except KeyError:
             messagebox.showinfo('Info', 'Number of last values for averaging for mode determination not found in ini '
                                         'file. Taking standard value of 5.')
@@ -50,22 +50,22 @@ class ItechIT6726VPowerSupply:
         self._under_voltage_protection = 0
         try:
             # load the saved values from the ini file
-            self.set_pid_values(0, 0, self.config['DC1']['p_voltage'])
-            self.set_pid_values(0, 1, self.config['DC1']['i_voltage'])
-            self.set_pid_values(0, 2, self.config['DC1']['d_voltage'])
-            self.set_pid_values(1, 0, self.config['DC1']['p_power'])
-            self.set_pid_values(1, 1, self.config['DC1']['i_power'])
-            self.set_pid_values(1, 2, self.config['DC1']['d_power'])
-            self.set_pid_values(2, 0, self.config['DC1']['p_current'])
-            self.set_pid_values(2, 1, self.config['DC1']['i_current'])
-            self.set_pid_values(2, 2, self.config['DC1']['d_current'])
-            self._pid_sleep_time = float(self.config['DC1']['pid_sleep_time'])
+            self.set_pid_values(0, 0, self._config['DC1']['p_voltage'])
+            self.set_pid_values(0, 1, self._config['DC1']['i_voltage'])
+            self.set_pid_values(0, 2, self._config['DC1']['d_voltage'])
+            self.set_pid_values(1, 0, self._config['DC1']['p_power'])
+            self.set_pid_values(1, 1, self._config['DC1']['i_power'])
+            self.set_pid_values(1, 2, self._config['DC1']['d_power'])
+            self.set_pid_values(2, 0, self._config['DC1']['p_current'])
+            self.set_pid_values(2, 1, self._config['DC1']['i_current'])
+            self.set_pid_values(2, 2, self._config['DC1']['d_current'])
+            self._pid_sleep_time = float(self._config['DC1']['pid_sleep_time'])
         except KeyError:  # key Pulser not found in config (no config present)
             messagebox.showinfo('Info', 'PID values were not found in ini file.')
         try:
-            self._pid_sleep_time = float(self.config['DC1']['pid_sleep_time'])
-            self._over_voltage_protection = float(self.config['DC1']['over_voltage_protection'])
-            self._under_voltage_protection = float(self.config['DC1']['under_voltage_protection'])
+            self._pid_sleep_time = float(self._config['DC1']['pid_sleep_time'])
+            self._over_voltage_protection = float(self._config['DC1']['over_voltage_protection'])
+            self._under_voltage_protection = float(self._config['DC1']['under_voltage_protection'])
         except KeyError:  # key Pulser not found in config (no config present)
             messagebox.showinfo('Info', 'PID sleep time, OVP or UVP value were not found in ini file.')
 
@@ -85,10 +85,7 @@ class ItechIT6726VPowerSupply:
 
     @property
     def setpoints(self):
-        return self._setpoint
-
-    def get_setpoints(self):
-        return self._setpoint
+        return self._setpoints
 
     def set_setpoint_for_mode(self, mode, value):
         try:
@@ -105,11 +102,47 @@ class ItechIT6726VPowerSupply:
             if int_value < 0 or int_value > self._setpoint_max[int_mode]:
                 raise ValueError('Setpoint value must be between 0 and ' + str(self._setpoint_max[int_mode]))
             else:
-                self._setpoint[int_mode] = int_value
+                self._setpoints[int_mode] = int_value
+
+    @property
+    def output(self):
+        return self._status['outputON']
+
+    @output.setter
+    def output(self, value):
+        if self._connected:
+            if value:  # switch power supply ON
+                self._inst.write(":OUTPut ON")  # output voltage ON
+                self._status['outputON'] = True
+                # get the actual PID values
+                p_voltage = self.get_pid_values(0)[0]
+                i_voltage = self.get_pid_values(0)[1]
+                d_voltage = self.get_pid_values(0)[2]
+                p_power = self.get_pid_values(1)[0]
+                i_power = self.get_pid_values(1)[1]
+                d_power = self.get_pid_values(1)[2]
+                p_current = self.get_pid_values(2)[0]
+                i_current = self.get_pid_values(2)[1]
+                d_current = self.get_pid_values(2)[2]
+                # start new thread with PID regulation!!!
+                threading.Thread(target=self.pid_control, args=(p_voltage, i_voltage, d_voltage, p_power, i_power,
+                                                                d_power, p_current, i_current, d_current)).start()
+            else:  # output voltage OFF
+                self._inst.write(":OUTPut OFF")
+                self._status['outputON'] = False  # change the status (output ON/OFF)
+
+
+    @property
+    def connected(self):
+        return self._connected
 
     @property
     def inst(self):
         return self._inst
+
+    @property
+    def status(self):
+        return self._status
 
     @property
     def buffer_time(self):
@@ -180,11 +213,11 @@ class ItechIT6726VPowerSupply:
         time_prev = time.time() - time_start    # calculate the initial time
         # take the initial error of the controlled value (SETPOINT - 0 = SETPOINT) based on the selected mode
         if self.mode == 0:
-            e_prev = self.get_setpoints()[self.mode]
+            e_prev = self.setpoints[self.mode]
         elif self.mode == 1:
-            e_prev = self.get_setpoints()[self.mode]
+            e_prev = self.setpoints[self.mode]
         elif self.mode == 2:
-            e_prev = self.get_setpoints()[self.mode]
+            e_prev = self.setpoints[self.mode]
         mode_prev = self.mode   # keep the initial mode value
         # time.sleep(0.05)
 
@@ -198,17 +231,17 @@ class ItechIT6726VPowerSupply:
                 time_prev, e_prev, e_sum, u_prev = self.pid_control_one_cycle(time_start, time_prev, e_prev,
                                                                                 e_sum, p_voltage, i_voltage,
                                                                                 d_voltage, actual_value,
-                                                                                self.get_setpoints()[self.mode])
+                                                                                self.setpoints[self.mode])
             if self.mode == 1:  # power mode
                 actual_value = power_ps
                 time_prev, e_prev, e_sum, u_prev = self.pid_control_one_cycle(time_start, time_prev, e_prev,
                                                                         e_sum, p_power, i_power, d_power, actual_value,
-                                                                        self.get_setpoints()[self.mode])
+                                                                        self.setpoints[self.mode])
             if self.mode == 2:  # current mode
                 actual_value = current_ps
                 time_prev, e_prev, e_sum, u_prev = self.pid_control_one_cycle(time_start, time_prev, e_prev,
                                                                         e_sum, p_current, i_current, d_current,
-                                                                        actual_value, self.get_setpoints()[self.mode])
+                                                                        actual_value, self.setpoints[self.mode])
 
             self.add_values_to_buffers(time_prev, u_prev, voltage_ps, power_ps, current_ps)
             avg_buffer_voltage_ps, avg_buffer_power_ps, avg_buffer_current_ps = \
@@ -268,9 +301,9 @@ class ItechIT6726VPowerSupply:
         return avg_voltage_ps, avg_power_ps, avg_current_ps
 
     def mode_determination(self, avg_voltage_ps, avg_power_ps, avg_current_ps, mode_prev):
-        voltage_max = round(self.get_setpoints()[0])
-        power_max = round(self.get_setpoints()[1])
-        current_max = round(self.get_setpoints()[2])
+        voltage_max = round(self.setpoints[0])
+        power_max = round(self.setpoints[1])
+        current_max = round(self.setpoints[2])
         avg_voltage_ps = round(avg_voltage_ps)
         avg_power_ps = round(avg_power_ps)
         avg_current_ps = round(avg_current_ps)
@@ -298,41 +331,6 @@ class ItechIT6726VPowerSupply:
         elif mode == 2 and (avg_power_ps > power_max):
             mode = 1
         return mode
-
-    @property
-    def output(self):
-        return self._status['outputON']
-
-    @output.setter
-    def output(self, value):
-        if self._connected:
-            if value:   # switch power supply ON
-                self._inst.write(":OUTPut ON")  # output voltage ON
-                self._status['outputON'] = True
-                # get the actual PID values
-                p_voltage = self.get_pid_values(0)[0]
-                i_voltage = self.get_pid_values(0)[1]
-                d_voltage = self.get_pid_values(0)[2]
-                p_power = self.get_pid_values(1)[0]
-                i_power = self.get_pid_values(1)[1]
-                d_power = self.get_pid_values(1)[2]
-                p_current = self.get_pid_values(2)[0]
-                i_current = self.get_pid_values(2)[1]
-                d_current = self.get_pid_values(2)[2]
-                # start new thread with PID regulation!!!
-                threading.Thread(target=self.pid_control, args=(p_voltage, i_voltage, d_voltage, p_power, i_power,
-                                                                d_power, p_current, i_current, d_current)).start()
-            else:       # output voltage OFF
-                self._inst.write(":OUTPut OFF")
-                self._status['outputON'] = False    # change the status (output ON/OFF)
-
-    @property
-    def status(self):
-        return self._status
-
-    @property
-    def connected(self):
-        return self._connected
 
     def connect(self, visa_resource_id):
         rm = pyvisa.ResourceManager('@py')

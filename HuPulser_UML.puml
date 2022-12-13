@@ -1,0 +1,82 @@
+@startuml
+class HuPulser_gui {
+    - _ps1
+    - _pulser
+    - _config
+    - _m_plot_ps
+    - _m_plot_pulser
+    - _anim
+    << GUI elements are not included >>
+
+    + ps1_connect()
+    + ps1_periodic_update()
+    + ps1_setpoint_focus_out()
+    + ps1_setpoint_confirmed()
+    + pid_value_confirmed()
+    + pid_value_focus_out()
+    + ps1_toggle_output()
+    + ps1_plot_y_setpoint_confirmed()
+    + ps1_plot_y_setpoint_focus_out()
+    + ps1_stop()
+    + pulser_connect()
+    + pulser_frequency_modified()
+    + pulser_frequency_confirmed()
+    + pulser_activate_ch2()
+    + pulser_shape()
+    + pulser_toggle_output()
+    + pulser_stop()
+    + pulser_special_key_press()
+    + plot_change_scale()
+    + on_closing()
+}
+
+class ItechIT6726VPowerSupply {
+    - _mode <<get/set>>
+    - _setpoint <<get>>
+    - _setpoint_max
+    - _output <<get/set>>
+    - _connected <<get>>
+    - _inst <<get>>
+    - _status <<get>>
+    - _thread
+    - _config
+    - _buffer_no_elements
+    - _mode_determination_no_of_values
+    - _buffer_time <<get>>
+    - _buffer_voltage_calc <<get>>
+    - _buffer_voltage_ps <<get>>
+    - _buffer_power_ps <<get>>
+    - _buffer_current_ps <<get>>
+    - _pid_values_voltage
+    - _pid_values_power
+    - _pid_values_current
+    - _pid_sleep_time
+    - _over_voltage_protection
+    - _under_voltage_protection
+
+    + set_setpoint_for_mode()
+    + get_pid_values()
+    + set_pid_values()
+    + pid_control()
+    + pid_control_one_cycle()
+    + read_actual_value_for_pid()
+    + add_values_to_buffers()
+    + clear_buffers()
+    + calculate_average_values_for_mode_determination()
+    + mode_determination()
+    + connect()
+    + disconnect()
+}
+
+class dataBuffer {
+    - _size
+    - _buffer <<get>>
+
+    + update()
+    + clear()
+    + average_value_from_last_n_values()
+}
+HuPulser_gui *-- ItechIT6726VPowerSupply : > 1
+ItechIT6726VPowerSupply *-- dataBuffer : > 5
+
+@enduml

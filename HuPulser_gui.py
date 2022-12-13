@@ -15,21 +15,21 @@ class HuPulserGui:
         self.root = master
         master.title(":* pulsed power supply control")
         # **** init hardware objects ****
-        self.ps1 = ItechIT6726VPowerSupply()
-        self.pulser = RigolDG4102Pulser()
+        self._ps1 = ItechIT6726VPowerSupply()
+        self._pulser = RigolDG4102Pulser()
         # load last state of instruments
-        self.config = configparser.ConfigParser()
-        self.config.read('hupulser.ini')
+        self._config = configparser.ConfigParser()
+        self._config.read('hupulser.ini')
         try:
-            self.ps1.set_setpoint_for_mode(0, self.config['DC1']['setpoint_voltage'])
-            self.ps1.set_setpoint_for_mode(1, self.config['DC1']['setpoint_power'])
-            self.ps1.set_setpoint_for_mode(2, self.config['DC1']['setpoint_current'])
+            self._ps1.set_setpoint_for_mode(0, self._config['DC1']['setpoint_voltage'])
+            self._ps1.set_setpoint_for_mode(1, self._config['DC1']['setpoint_power'])
+            self._ps1.set_setpoint_for_mode(2, self._config['DC1']['setpoint_current'])
         except KeyError:
             messagebox.showinfo('Info', 'Some config values for DC1 not found in ini file.')
         try:
-            self.pulser.frequency = self.config['Pulser']['frequency']
-            self.pulser.pulse_shape = self.config['Pulser']['pulse_shape'].split(',')
-            self.pulser.ch2_enabled = self.config['Pulser']['ch2_enabled'] == 'True'
+            self._pulser.frequency = self._config['Pulser']['frequency']
+            self._pulser.pulse_shape = self._config['Pulser']['pulse_shape'].split(',')
+            self._pulser.ch2_enabled = self._config['Pulser']['ch2_enabled'] == 'True'
         except KeyError:
             messagebox.showinfo('Info', 'Some config values for Pulser not found in ini file.')
 
@@ -72,7 +72,7 @@ class HuPulserGui:
         label_ps1_voltage = tk.Label(ps1_values_frame, text='Voltage')
         label_ps1_voltage.grid(row=1, column=0, padx=5, pady=(5, 0), sticky='E')
         self.entry_ps1_voltage_SP = tk.Entry(ps1_values_frame, width=6, justify=tk.RIGHT)
-        self.entry_ps1_voltage_SP.insert(0, self.ps1.get_setpoints()[0])
+        self.entry_ps1_voltage_SP.insert(0, self._ps1.setpoints[0])
         self.entry_ps1_voltage_SP.bind("<Return>", lambda event, mode=0,
                                                           entry=self.entry_ps1_voltage_SP: self.ps1_setpoint_confirmed(
             mode, entry))
@@ -91,7 +91,7 @@ class HuPulserGui:
         label_ps1_power = tk.Label(ps1_values_frame, text='Power')
         label_ps1_power.grid(row=2, column=0, padx=5, pady=(5, 0), sticky='E')
         self.entry_ps1_power_SP = tk.Entry(ps1_values_frame, width=6, justify=tk.RIGHT)
-        self.entry_ps1_power_SP.insert(0, self.ps1.get_setpoints()[1])
+        self.entry_ps1_power_SP.insert(0, self._ps1.setpoints[1])
         self.entry_ps1_power_SP.bind("<Return>", lambda event, mode=1, entry=self.entry_ps1_power_SP: self.ps1_setpoint_confirmed(mode, entry))
         self.entry_ps1_power_SP.bind("<FocusOut>", lambda event, mode=1, entry=self.entry_ps1_power_SP: self.ps1_setpoint_focus_out(mode, entry))
         self.entry_ps1_power_SP.grid(row=2, column=1, padx=5, pady=(5, 0), sticky='E')
@@ -106,7 +106,7 @@ class HuPulserGui:
         label_ps1_current = tk.Label(ps1_values_frame, text='Current')
         label_ps1_current.grid(row=3, column=0, padx=5, pady=(5, 0), sticky='E')
         self.entry_ps1_current_SP = tk.Entry(ps1_values_frame, width=6, justify=tk.RIGHT)
-        self.entry_ps1_current_SP.insert(0, self.ps1.get_setpoints()[2])
+        self.entry_ps1_current_SP.insert(0, self._ps1.setpoints[2])
         self.entry_ps1_current_SP.bind("<Return>", lambda event, mode=2, entry=self.entry_ps1_current_SP: self.ps1_setpoint_confirmed(mode, entry))
         self.entry_ps1_current_SP.bind("<FocusOut>", lambda event, mode=2, entry=self.entry_ps1_current_SP: self.ps1_setpoint_focus_out(mode, entry))
         self.entry_ps1_current_SP.grid(row=3, column=1, padx=5, pady=(5, 0), sticky='E')
@@ -128,7 +128,7 @@ class HuPulserGui:
         label_ps_pid_p_coef_voltage = tk.Label(ps1_pid, text='P')
         label_ps_pid_p_coef_voltage.grid(row=1, column=0, padx=2, pady=(5, 0), sticky='E')
         self.entry_ps_pid_p_coef_voltage = tk.Entry(ps1_pid, width=6, justify=tk.RIGHT)
-        self.entry_ps_pid_p_coef_voltage.insert(0, self.ps1.get_pid_values(0)[0])
+        self.entry_ps_pid_p_coef_voltage.insert(0, self._ps1.get_pid_values(0)[0])
         self.entry_ps_pid_p_coef_voltage.bind("<Return>", lambda event, mode=0, index=0,
                                                                entry=self.entry_ps_pid_p_coef_voltage: self.pid_value_confirmed(
             mode, index, entry))
@@ -140,7 +140,7 @@ class HuPulserGui:
         label_ps_pid_i_coef_voltage = tk.Label(ps1_pid, text='I')
         label_ps_pid_i_coef_voltage.grid(row=1, column=2, padx=2, pady=(5, 0), sticky='E')
         self.entry_ps_pid_i_coef_voltage = tk.Entry(ps1_pid, width=6, justify=tk.RIGHT)
-        self.entry_ps_pid_i_coef_voltage.insert(0, self.ps1.get_pid_values(0)[1])
+        self.entry_ps_pid_i_coef_voltage.insert(0, self._ps1.get_pid_values(0)[1])
         self.entry_ps_pid_i_coef_voltage.bind("<Return>", lambda event, mode=0, index=1,
                                                                entry=self.entry_ps_pid_i_coef_voltage: self.pid_value_confirmed(
             mode, index, entry))
@@ -152,7 +152,7 @@ class HuPulserGui:
         label_ps_pid_d_coef_voltage = tk.Label(ps1_pid, text='D')
         label_ps_pid_d_coef_voltage.grid(row=1, column=4, padx=2, pady=(5, 0), sticky='E')
         self.entry_ps_pid_d_coef_voltage = tk.Entry(ps1_pid, width=6, justify=tk.RIGHT)
-        self.entry_ps_pid_d_coef_voltage.insert(0, self.ps1.get_pid_values(0)[2])
+        self.entry_ps_pid_d_coef_voltage.insert(0, self._ps1.get_pid_values(0)[2])
         self.entry_ps_pid_d_coef_voltage.bind("<Return>", lambda event, mode=0, index=2,
                                                                entry=self.entry_ps_pid_d_coef_voltage: self.pid_value_confirmed(
             mode, index, entry))
@@ -168,7 +168,7 @@ class HuPulserGui:
         label_ps_pid_p_coef_power = tk.Label(ps1_pid, text='P')
         label_ps_pid_p_coef_power.grid(row=3, column=0, padx=2, pady=(5, 0), sticky='E')
         self.entry_ps_pid_p_coef_power = tk.Entry(ps1_pid, width=6, justify=tk.RIGHT)
-        self.entry_ps_pid_p_coef_power.insert(0, self.ps1.get_pid_values(1)[0])
+        self.entry_ps_pid_p_coef_power.insert(0, self._ps1.get_pid_values(1)[0])
         self.entry_ps_pid_p_coef_power.bind("<Return>", lambda event, mode=1, index=0,
                                         entry=self.entry_ps_pid_p_coef_power: self.pid_value_confirmed(mode, index, entry))
         self.entry_ps_pid_p_coef_power.bind("<FocusOut>", lambda event, mode=1, index=0,
@@ -178,7 +178,7 @@ class HuPulserGui:
         label_ps_pid_i_coef_power = tk.Label(ps1_pid, text='I')
         label_ps_pid_i_coef_power.grid(row=3, column=2, padx=2, pady=(5, 0), sticky='E')
         self.entry_ps_pid_i_coef_power = tk.Entry(ps1_pid, width=6, justify=tk.RIGHT)
-        self.entry_ps_pid_i_coef_power.insert(0, self.ps1.get_pid_values(1)[1])
+        self.entry_ps_pid_i_coef_power.insert(0, self._ps1.get_pid_values(1)[1])
         self.entry_ps_pid_i_coef_power.bind("<Return>", lambda event, mode=1, index=1,
                                                          entry=self.entry_ps_pid_i_coef_power: self.pid_value_confirmed(mode, index, entry))
         self.entry_ps_pid_i_coef_power.bind("<FocusOut>", lambda event, mode=1, index=1,
@@ -188,7 +188,7 @@ class HuPulserGui:
         label_ps_pid_d_coef_power = tk.Label(ps1_pid, text='D')
         label_ps_pid_d_coef_power.grid(row=3, column=4, padx=2, pady=(5, 0), sticky='E')
         self.entry_ps_pid_d_coef_power = tk.Entry(ps1_pid, width=6, justify=tk.RIGHT)
-        self.entry_ps_pid_d_coef_power.insert(0, self.ps1.get_pid_values(1)[2])
+        self.entry_ps_pid_d_coef_power.insert(0, self._ps1.get_pid_values(1)[2])
         self.entry_ps_pid_d_coef_power.bind("<Return>", lambda event, mode=1, index=2,
                                                          entry=self.entry_ps_pid_d_coef_power: self.pid_value_confirmed(mode, index, entry))
         self.entry_ps_pid_d_coef_power.bind("<FocusOut>", lambda event, mode=1, index=2,
@@ -202,7 +202,7 @@ class HuPulserGui:
         label_ps_pid_p_coef_current = tk.Label(ps1_pid, text='P')
         label_ps_pid_p_coef_current.grid(row=5, column=0, padx=2, pady=(5, 0), sticky='E')
         self.entry_ps_pid_p_coef_current = tk.Entry(ps1_pid, width=6, justify=tk.RIGHT)
-        self.entry_ps_pid_p_coef_current.insert(0, self.ps1.get_pid_values(2)[0])
+        self.entry_ps_pid_p_coef_current.insert(0, self._ps1.get_pid_values(2)[0])
         self.entry_ps_pid_p_coef_current.bind("<Return>", lambda event, mode=2, index=0,
                                                          entry=self.entry_ps_pid_p_coef_current: self.pid_value_confirmed(mode, index,
                                                                                                                   entry))
@@ -213,7 +213,7 @@ class HuPulserGui:
         label_ps_pid_i_coef_current = tk.Label(ps1_pid, text='I')
         label_ps_pid_i_coef_current.grid(row=5, column=2, padx=2, pady=(5, 0), sticky='E')
         self.entry_ps_pid_i_coef_current = tk.Entry(ps1_pid, width=6, justify=tk.RIGHT)
-        self.entry_ps_pid_i_coef_current.insert(0, self.ps1.get_pid_values(2)[1])
+        self.entry_ps_pid_i_coef_current.insert(0, self._ps1.get_pid_values(2)[1])
         self.entry_ps_pid_i_coef_current.bind("<Return>", lambda event, mode=2, index=1,
                                                          entry=self.entry_ps_pid_i_coef_current: self.pid_value_confirmed(mode, index, entry))
         self.entry_ps_pid_i_coef_current.bind("<FocusOut>", lambda event, mode=2, index=1, entry=self.entry_ps_pid_i_coef_current: self.pid_value_focus_out(mode, index, entry))
@@ -222,7 +222,7 @@ class HuPulserGui:
         label_ps_pid_d_coef_current = tk.Label(ps1_pid, text='D')
         label_ps_pid_d_coef_current.grid(row=5, column=4, padx=2, pady=(5, 0), sticky='E')
         self.entry_ps_pid_d_coef_current = tk.Entry(ps1_pid, width=6, justify=tk.RIGHT)
-        self.entry_ps_pid_d_coef_current.insert(0, self.ps1.get_pid_values(2)[2])
+        self.entry_ps_pid_d_coef_current.insert(0, self._ps1.get_pid_values(2)[2])
         self.entry_ps_pid_d_coef_current.bind("<Return>", lambda event, mode=2, index=2,
                                                          entry=self.entry_ps_pid_d_coef_current: self.pid_value_confirmed(mode, index, entry))
         self.entry_ps_pid_d_coef_current.bind("<FocusOut>", lambda event, mode=2, index=2,
@@ -233,12 +233,12 @@ class HuPulserGui:
         ps_plot_frame = tk.LabelFrame(main_frame, background=self.root['bg'], borderwidth=2, relief=tk.RIDGE,
                                    text='  PS PLOT  ')
         ps_plot_frame.pack(side=tk.LEFT, fill=tk.Y, padx=2, pady=(5, 2))
-        self.m_plot_ps = MatplotlibPlot3axes(ps_plot_frame)
+        self._m_plot_ps = MatplotlibPlot3axes(ps_plot_frame)
 
-        anim = FuncAnimation(self.m_plot_ps, self.m_plot_ps.plot_waveforms_realtime,
-                             fargs=(self.ps1.buffer_time, self.ps1.buffer_voltage, self.ps1.buffer_power,
-                                    self.ps1.buffer_current, self.ps1.buffer_voltage_ps, self.ps1.buffer_power_ps,
-                                    self.ps1.setpoints[1], self.ps1.setpoints[0], self.ps1.setpoints[2]), frames=10,
+        self._anim = FuncAnimation(self._m_plot_ps, self._m_plot_ps.plot_waveforms_realtime,
+                             fargs=(self._ps1.buffer_time, self._ps1.buffer_voltage, self._ps1.buffer_power,
+                                    self._ps1.buffer_current, self._ps1.buffer_voltage_ps, self._ps1.buffer_power_ps,
+                                    self._ps1.setpoints[1], self._ps1.setpoints[0], self._ps1.setpoints[2]), frames=10,
                              interval=100)
 
         ### PS PLOT CONFGI
@@ -248,7 +248,7 @@ class HuPulserGui:
         label_ps_plot_voltage_max_limit = tk.Label(ps_plot_config, text='Voltage', fg='blue')
         label_ps_plot_voltage_max_limit.grid(row=0, column=0, padx=5, sticky='E')
         self.entry_ps_plot_voltage_max_limit = tk.Entry(ps_plot_config, width=6, justify=tk.RIGHT)
-        self.entry_ps_plot_voltage_max_limit.insert(0, self.m_plot_ps.y_max_values[0])
+        self.entry_ps_plot_voltage_max_limit.insert(0, self._m_plot_ps.y_max_values[0])
         self.entry_ps_plot_voltage_max_limit.bind("<Return>", lambda event, ax=0,
                             entry=self.entry_ps_plot_voltage_max_limit: self.ps1_plot_y_setpoint_confirmed(ax, entry))
         self.entry_ps_plot_voltage_max_limit.bind("<FocusOut>", lambda event, ax=0,
@@ -260,7 +260,7 @@ class HuPulserGui:
         label_ps_plot_power_max_limit = tk.Label(ps_plot_config, text='Power')
         label_ps_plot_power_max_limit.grid(row=0, column=3, padx=5, sticky='E')
         self.entry_ps_plot_power_max_limit = tk.Entry(ps_plot_config, width=6, justify=tk.RIGHT)
-        self.entry_ps_plot_power_max_limit.insert(0, self.m_plot_ps.y_max_values[1])
+        self.entry_ps_plot_power_max_limit.insert(0, self._m_plot_ps.y_max_values[1])
         self.entry_ps_plot_power_max_limit.bind("<Return>", lambda event, ax=1,
                                                                      entry=self.entry_ps_plot_power_max_limit: self.ps1_plot_y_setpoint_confirmed(
             ax, entry))
@@ -274,7 +274,7 @@ class HuPulserGui:
         label_ps_plot_current_max_limit = tk.Label(ps_plot_config, text='Current', fg='red')
         label_ps_plot_current_max_limit.grid(row=0, column=6, padx=5, sticky='E')
         self.entry_ps_plot_current_max_limit = tk.Entry(ps_plot_config, width=6, justify=tk.RIGHT)
-        self.entry_ps_plot_current_max_limit.insert(0, self.m_plot_ps.y_max_values[2])
+        self.entry_ps_plot_current_max_limit.insert(0, self._m_plot_ps.y_max_values[2])
         self.entry_ps_plot_current_max_limit.bind("<Return>", lambda event, ax=2,
                                                                    entry=self.entry_ps_plot_current_max_limit: self.ps1_plot_y_setpoint_confirmed(
             ax, entry))
@@ -304,7 +304,7 @@ class HuPulserGui:
         self.entry_pulser_frequency.bind("<Return>", self.pulser_frequency_confirmed)
         self.entry_pulser_frequency.bind("<FocusOut>", self.pulser_frequency_modified)
         self.entry_pulser_frequency.grid(row=2, column=1, padx=5, pady=(5, 0), sticky='E')
-        self.entry_pulser_frequency.insert(0, self.pulser.frequency)
+        self.entry_pulser_frequency.insert(0, self._pulser.frequency)
         label_pulser_frequency_units = tk.Label(pulser_frame, text="Hz", background=self.root['bg'])
         label_pulser_frequency_units.grid(row=2, column=2, padx=5, pady=(5, 0), sticky='W')
 
@@ -313,7 +313,7 @@ class HuPulserGui:
 
         self.text_pulser_shape = tk.Text(pulser_frame, width=10, height=6, font='TkDefaultFont')
         self.text_pulser_shape.grid(row=3, column=1, padx=5, pady=(5, 0), sticky='E')
-        for s in self.pulser.pulse_shape:
+        for s in self._pulser.pulse_shape:
             self.text_pulser_shape.insert(tk.INSERT, s + '\n')  # fill text by actual value from pulser
         label_pulser_shape_units = tk.Label(pulser_frame, text="\u00B5s", background=self.root['bg'])
         label_pulser_shape_units.grid(row=3, column=2, padx=5, pady=(5, 0), sticky='W')
@@ -328,7 +328,7 @@ class HuPulserGui:
         self.toggleButton_pulser_activate_ch2 = ToggleButton(pulser_frame, text="Enable channel 2",
                                                              command=self.pulser_activate_ch2, ind_height=12)
         self.toggleButton_pulser_activate_ch2.grid(row=5, column=0, columnspan=2, padx=5, pady=(5, 0))
-        self.toggleButton_pulser_activate_ch2.on = self.pulser.ch2_enabled
+        self.toggleButton_pulser_activate_ch2.on = self._pulser.ch2_enabled
 
         self.indicator_pulser_ch1_output = Indicator(pulser_frame, 'Channel 1 output')
         self.indicator_pulser_ch1_output.grid(row=6, column=0, columnspan=2, padx=5)
@@ -340,37 +340,37 @@ class HuPulserGui:
         plot_frame = tk.LabelFrame(main_frame, background=self.root['bg'], borderwidth=2, relief=tk.RIDGE,
                                    text='  PULSER PLOT  ')
         plot_frame.pack(side=tk.LEFT, fill=tk.Y, padx=2, pady=(5, 2))
-        self.m_plot_pulser = MatplotlibPlot(plot_frame)
+        self._m_plot_pulser = MatplotlibPlot(plot_frame)
         self.scale_plot = tk.Scale(plot_frame, orient=tk.HORIZONTAL, from_=1, to=100,
                                    command=self.plot_change_scale, background=self.root['bg'])
         self.scale_plot.set(100)
         self.scale_plot.pack()
-        t, wf1, wf2 = self.pulser.get_waveforms()
-        self.m_plot_pulser.plot_waveforms(t, wf1, wf2, self.pulser.ch2_enabled, self.pulser.get_period(),
+        t, wf1, wf2 = self._pulser.get_waveforms()
+        self._m_plot_pulser.plot_waveforms(t, wf1, wf2, self._pulser.ch2_enabled, self._pulser.get_period(),
                                    self.scale_plot.get())
 
         # search for special key press (F1, F2, ...) and modify pulse shape accordingly
-        for s in self.config['Pulser']:   # look for preset pulse shapes
+        for s in self._config['Pulser']:   # look for preset pulse shapes
             if s[0:6] == 'preset':  # if preset found
                 key = s[7:9]        # decode key from preset string
                 self.root.bind_all("<{:s}>".format(key).upper(), self.pulser_special_key_press)  # register key callback
 
     # connect or disconnect DC1 power supply
     def ps1_connect(self):
-        if not self.ps1.connected:
+        if not self._ps1.connected:
             try:
-                self.ps1.connect(self.config['DC1']['resource_id'])
+                self._ps1.connect(self._config['DC1']['resource_id'])
             except Exception as e:
                 messagebox.showerror('Error', 'Connection to IT6726V failed\n\n' + str(e))
             finally:
-                self.indicator_ps1_connected.on = self.ps1.connected
-                self.ps1.inst.write("*CLS")     # clean the PS register
-                self.ps1.inst.write("*RST")     # set the PS default settings
+                self.indicator_ps1_connected.on = self._ps1.connected
+                self._ps1.inst.write("*CLS")     # clean the PS register
+                self._ps1.inst.write("*RST")     # set the PS default settings
         else:
             self.ps1_stop()
-            self.ps1.disconnect()
-            self.indicator_ps1_output.on = self.ps1.status['outputON']
-            self.indicator_ps1_connected.on = self.ps1.connected
+            self._ps1.disconnect()
+            self.indicator_ps1_output.on = self._ps1.status['outputON']
+            self.indicator_ps1_connected.on = self._ps1.connected
             # turn off the corresponding indicators
             self.indicator_ps1_voltage_regime.on = False
             self.indicator_ps1_power_regime.on = False
@@ -379,21 +379,21 @@ class HuPulserGui:
 
     # periodic update of U, P, I values in GUI; running in a thread
     def ps1_periodic_update(self):
-        while self.ps1.output:
+        while self._ps1.output:
             # take the last value from the corresponding buffers
-            self.label_ps1_voltage_live.config(text=str(round(self.ps1.buffer_voltage[-1])))
-            self.label_ps1_power_live.config(text=str(round(self.ps1.buffer_power[-1])))
-            self.label_ps1_current_live.config(text=str(round(self.ps1.buffer_current[-1])))
+            self.label_ps1_voltage_live.config(text=str(round(self._ps1.buffer_voltage[-1])))
+            self.label_ps1_power_live.config(text=str(round(self._ps1.buffer_power[-1])))
+            self.label_ps1_current_live.config(text=str(round(self._ps1.buffer_current[-1])))
             # activate the corresponding indicator based on the actual mode
-            if self.ps1.mode == 0:
+            if self._ps1.mode == 0:
                 self.indicator_ps1_voltage_regime.on = True
                 self.indicator_ps1_power_regime.on = False
                 self.indicator_ps1_current_regime.on = False
-            elif self.ps1.mode == 1:
+            elif self._ps1.mode == 1:
                 self.indicator_ps1_voltage_regime.on = False
                 self.indicator_ps1_power_regime.on = True
                 self.indicator_ps1_current_regime.on = False
-            elif self.ps1.mode == 2:
+            elif self._ps1.mode == 2:
                 self.indicator_ps1_voltage_regime.on = False
                 self.indicator_ps1_power_regime.on = False
                 self.indicator_ps1_current_regime.on = True
@@ -406,7 +406,7 @@ class HuPulserGui:
         except ValueError as e:
             messagebox.showerror('Error', str(e))
             entry.config(fg='red')
-        if not np.isclose(float_new_value, float(self.ps1.get_setpoints()[mode])):
+        if not np.isclose(float_new_value, float(self._ps1.setpoints[mode])):
             entry.config(fg='red')
         else:
             entry.config(fg='black')
@@ -414,7 +414,7 @@ class HuPulserGui:
     def ps1_setpoint_confirmed(self, mode, entry):
         try:
             new_value = entry.get()
-            self.ps1.set_setpoint_for_mode(mode, new_value)
+            self._ps1.set_setpoint_for_mode(mode, new_value)
             entry.config(fg='black')
         except ValueError as e:
             messagebox.showerror('Error', str(e))
@@ -422,7 +422,7 @@ class HuPulserGui:
     def pid_value_confirmed(self, pid_values, index, entry):
         try:
             new_value = entry.get()
-            self.ps1.set_pid_values(pid_values, index, new_value)
+            self._ps1.set_pid_values(pid_values, index, new_value)
             entry.config(fg='black')
         except ValueError as e:
             messagebox.showerror('Error', str(e))
@@ -434,28 +434,28 @@ class HuPulserGui:
         except ValueError as e:
             messagebox.showerror('Error', str(e))
             entry.config(fg='red')
-        if not np.isclose(float_new_value, float(self.ps1.get_pid_values(mode)[index])):
+        if not np.isclose(float_new_value, float(self._ps1.get_pid_values(mode)[index])):
             entry.config(fg='red')
         else:
             entry.config(fg='black')
 
     def ps1_toggle_output(self):
-        self.ps1.output = not self.ps1.output
-        self.indicator_ps1_output.on = self.ps1.status['outputON']
-        if not self.ps1.output:
-            self.ps1.mode = 1  # initial mode is Power mode
+        self._ps1.output = not self._ps1.output
+        self.indicator_ps1_output.on = self._ps1.status['outputON']
+        if not self._ps1.output:
+            self._ps1.mode = 1  # initial mode is Power mode
             self.indicator_ps1_voltage_regime.on = False
             self.indicator_ps1_power_regime.on = False
             self.indicator_ps1_current_regime.on = False
-        if self.ps1.output:
-            self.ps1.clear_buffers()
+        if self._ps1.output:
+            self._ps1.clear_buffers()
             threading.Thread(target=self.ps1_periodic_update).start()
 
     def ps1_plot_y_setpoint_confirmed(self, ax_number, entry):
         # new max y value for axis in PS plot
         try:
             new_value = entry.get()
-            self.m_plot_ps.set_y_max_values(ax_number, new_value)
+            self._m_plot_ps.set_y_max_values(ax_number, new_value)
             entry.config(fg='black')
         except ValueError as e:
             messagebox.showerror('Error', str(e))
@@ -467,32 +467,32 @@ class HuPulserGui:
         except ValueError as e:
             messagebox.showerror('Error', str(e))
             entry.config(fg='red')
-        if not np.isclose(float_new_value, float(self.m_plot_ps.y_max_values[ax_number])):
+        if not np.isclose(float_new_value, float(self._m_plot_ps.y_max_values[ax_number])):
             entry.config(fg='red')
         else:
             entry.config(fg='black')
 
     def ps1_stop(self):
-        self.ps1.output = False
+        self._ps1.output = False
 
     def pulser_connect(self):
-        if not self.pulser.connected:
+        if not self._pulser.connected:
             try:
-                self.pulser.connect('USB0::6833::1601::DG4E223201180::0::INSTR')
+                self._pulser.connect('USB0::6833::1601::DG4E223201180::0::INSTR')
             except Exception as e:
                 messagebox.showerror('Error', 'Connection to RigolDG4102 failed\n\n' + str(e))
             finally:
-                self.indicator_pulser_connected.on = self.pulser.connected
+                self.indicator_pulser_connected.on = self._pulser.connected
         else:
             self.pulser_stop()
-            self.pulser.disconnect()
-            self.indicator_pulser_connected.on = self.pulser.connected
+            self._pulser.disconnect()
+            self.indicator_pulser_connected.on = self._pulser.connected
 
     def pulser_frequency_modified(self, event):
         # check if new value is different from instrument value
         try:
             new_value = int(event.widget.get())
-            value = self.pulser.frequency
+            value = self._pulser.frequency
             # pulser instance to get the value stored in pulser class instance
             if new_value != value:
                 event.widget.config(fg='red')
@@ -503,73 +503,73 @@ class HuPulserGui:
 
     def pulser_frequency_confirmed(self, event):
         try:
-            self.pulser.frequency = event.widget.get()
+            self._pulser.frequency = event.widget.get()
             event.widget.config(fg='black')
-            t, wf1, wf2 = self.pulser.get_waveforms()
-            self.m_plot_pulser.plot_waveforms(t, wf1, wf2, self.pulser.ch2_enabled, self.pulser.get_period(),
+            t, wf1, wf2 = self._pulser.get_waveforms()
+            self._m_plot_pulser.plot_waveforms(t, wf1, wf2, self._pulser.ch2_enabled, self._pulser.get_period(),
                                        self.scale_plot.get())
         except ValueError as e:
             messagebox.showerror('Error', str(e))
 
     def pulser_activate_ch2(self):
-        self.pulser.ch2_enabled = self.toggleButton_pulser_activate_ch2.on
-        t, wf1, wf2 = self.pulser.get_waveforms()
-        self.m_plot_pulser.plot_waveforms(t, wf1, wf2, self.pulser.ch2_enabled, self.pulser.get_period(),
+        self._pulser.ch2_enabled = self.toggleButton_pulser_activate_ch2.on
+        t, wf1, wf2 = self._pulser.get_waveforms()
+        self._m_plot_pulser.plot_waveforms(t, wf1, wf2, self._pulser.ch2_enabled, self._pulser.get_period(),
                                    self.scale_plot.get())
-        self.indicator_pulser_ch2_output.on = self.pulser.output and self.pulser.ch2_enabled
+        self.indicator_pulser_ch2_output.on = self._pulser.output and self._pulser.ch2_enabled
 
     def pulser_shape(self):
-        self.pulser.pulse_shape = self.text_pulser_shape.get("1.0", 'end').split()
-        t, wf1, wf2 = self.pulser.get_waveforms()
-        self.m_plot_pulser.plot_waveforms(t, wf1, wf2, self.pulser.ch2_enabled, self.pulser.get_period(),
+        self._pulser.pulse_shape = self.text_pulser_shape.get("1.0", 'end').split()
+        t, wf1, wf2 = self._pulser.get_waveforms()
+        self._m_plot_pulser.plot_waveforms(t, wf1, wf2, self._pulser.ch2_enabled, self._pulser.get_period(),
                                    self.scale_plot.get())
 
     def pulser_toggle_output(self):
-        self.pulser.output = not self.pulser.output
-        self.indicator_pulser_ch1_output.on = self.pulser.output
-        self.indicator_pulser_ch2_output.on = self.pulser.output and self.pulser.ch2_enabled
+        self._pulser.output = not self._pulser.output
+        self.indicator_pulser_ch1_output.on = self._pulser.output
+        self.indicator_pulser_ch2_output.on = self._pulser.output and self._pulser.ch2_enabled
 
     def pulser_stop(self):
-        self.pulser.output = False
-        self.indicator_pulser_ch1_output.on = self.pulser.output
-        self.indicator_pulser_ch2_output.on = self.pulser.output and self.pulser.ch2_enabled
+        self._pulser.output = False
+        self.indicator_pulser_ch1_output.on = self._pulser.output
+        self.indicator_pulser_ch2_output.on = self._pulser.output and self._pulser.ch2_enabled
 
     def pulser_special_key_press(self, event):
         # change the pulse shape based on the pressed special key (F1, F2, F3)
         self.text_pulser_shape.delete('1.0', 'end')
-        for s in self.config['Pulser']['preset_{:s}'.format(event.keysym).lower()].split(','):
+        for s in self._config['Pulser']['preset_{:s}'.format(event.keysym).lower()].split(','):
             self.text_pulser_shape.insert(tk.INSERT, s + '\n')  # fill text by actual value from pulser
 
     def plot_change_scale(self, value):
         value = int(value)
-        self.m_plot_pulser.set_x_lim(self.pulser.get_period(), value)
-        self.m_plot_pulser.canvas.draw()  # show the canvas at the screen
+        self._m_plot_pulser.set_x_lim(self._pulser.get_period(), value)
+        self._m_plot_pulser.canvas.draw()  # show the canvas at the screen
 
     def on_closing(self):
         self.pulser_stop()   # stop pulsing
         # save state to config
-        setpoints = self.ps1.get_setpoints()
-        self.config.set('DC1', 'setpoint_voltage', str(setpoints[0]))
-        self.config.set('DC1', 'setpoint_power', str(setpoints[1]))
-        self.config.set('DC1', 'setpoint_current', str(setpoints[2]))
-        self.config.set('DC1', 'p_voltage', str(self.ps1.get_pid_values(0)[0]))
-        self.config.set('DC1', 'i_voltage', str(self.ps1.get_pid_values(0)[1]))
-        self.config.set('DC1', 'd_voltage', str(self.ps1.get_pid_values(0)[2]))
-        self.config.set('DC1', 'p_power', str(self.ps1.get_pid_values(1)[0]))
-        self.config.set('DC1', 'i_power', str(self.ps1.get_pid_values(1)[1]))
-        self.config.set('DC1', 'd_power', str(self.ps1.get_pid_values(1)[2]))
-        self.config.set('DC1', 'p_current', str(self.ps1.get_pid_values(2)[0]))
-        self.config.set('DC1', 'i_current', str(self.ps1.get_pid_values(2)[1]))
-        self.config.set('DC1', 'd_current', str(self.ps1.get_pid_values(2)[2]))
+        setpoints = self._ps1.setpoints
+        self._config.set('DC1', 'setpoint_voltage', str(setpoints[0]))
+        self._config.set('DC1', 'setpoint_power', str(setpoints[1]))
+        self._config.set('DC1', 'setpoint_current', str(setpoints[2]))
+        self._config.set('DC1', 'p_voltage', str(self._ps1.get_pid_values(0)[0]))
+        self._config.set('DC1', 'i_voltage', str(self._ps1.get_pid_values(0)[1]))
+        self._config.set('DC1', 'd_voltage', str(self._ps1.get_pid_values(0)[2]))
+        self._config.set('DC1', 'p_power', str(self._ps1.get_pid_values(1)[0]))
+        self._config.set('DC1', 'i_power', str(self._ps1.get_pid_values(1)[1]))
+        self._config.set('DC1', 'd_power', str(self._ps1.get_pid_values(1)[2]))
+        self._config.set('DC1', 'p_current', str(self._ps1.get_pid_values(2)[0]))
+        self._config.set('DC1', 'i_current', str(self._ps1.get_pid_values(2)[1]))
+        self._config.set('DC1', 'd_current', str(self._ps1.get_pid_values(2)[2]))
 
-        self.config.set('DC1 - plot', 'max_voltage', str(self.m_plot_ps.y_max_values[0]))
-        self.config.set('DC1 - plot', 'max_power', str(self.m_plot_ps.y_max_values[1]))
-        self.config.set('DC1 - plot', 'max_current', str(self.m_plot_ps.y_max_values[2]))
+        self._config.set('DC1 - plot', 'max_voltage', str(self._m_plot_ps.y_max_values[0]))
+        self._config.set('DC1 - plot', 'max_power', str(self._m_plot_ps.y_max_values[1]))
+        self._config.set('DC1 - plot', 'max_current', str(self._m_plot_ps.y_max_values[2]))
 
-        self.config.set('Pulser', 'frequency', str(self.pulser.frequency))
-        self.config.set('Pulser', 'pulse_shape', ','.join(self.text_pulser_shape.get("1.0", 'end').split()))
-        self.config.set('Pulser', 'ch2_enabled', str(self.pulser.ch2_enabled))
+        self._config.set('Pulser', 'frequency', str(self._pulser.frequency))
+        self._config.set('Pulser', 'pulse_shape', ','.join(self.text_pulser_shape.get("1.0", 'end').split()))
+        self._config.set('Pulser', 'ch2_enabled', str(self._pulser.ch2_enabled))
 
         with open('hupulser.ini', 'w') as config_file:
-            self.config.write(config_file)
+            self._config.write(config_file)
         self.root.destroy()
