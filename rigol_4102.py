@@ -28,7 +28,7 @@ class RigolDG4102Pulser:
         return self._connected
 
     def connect(self, visa_resource_id):
-        rm = pyvisa.ResourceManager()
+        rm = pyvisa.ResourceManager('@py')
         # connect to a specific instrument
 
         self._inst = rm.open_resource(visa_resource_id, open_timeout=1000,
