@@ -5,17 +5,19 @@ import usb
 import configparser
 from data_buffer import DataBuffer
 from tkinter import messagebox
+from instrument import Instrument
 
 
 # DC power supply ITECH_IT6726V
-class ItechIT6726VPowerSupply:
+class ItechIT6726VPowerSupply(Instrument):
     def __init__(self):
+        super().__init__()
         self._mode = 1  # first mode after start is Power mode
         self._setpoints = [0.0, 0.0, 0.0]  # (U, P, I)
         self._setpoint_max = (3000, 1200, 5000)  # max U, P, I according to power supply
-        self._output = 0    # no output voltage after start
-        self._connected = False     # connection with PS
-        self._inst = None   # representation of the PS for read/write commands
+        # self._output = 0    # no output voltage after start
+        # self._connected = False     # connection with PS
+        # self._inst = None   # representation of the PS for read/write commands
         self._status = {'outputON': False}
         self._thread = None
         self._config = configparser.ConfigParser()
@@ -332,15 +334,15 @@ class ItechIT6726VPowerSupply:
             mode = 1
         return mode
 
-    def connect(self, visa_resource_id):
-        rm = pyvisa.ResourceManager('@py')
-        rm.list_resources()
-        # connect to a specific instrument
-        self._inst = rm.open_resource(visa_resource_id, timeout=1000, resource_pyclass=pyvisa.resources.USBInstrument)
-        self._connected = True
+    # def connect(self, visa_resource_id):
+    #     rm = pyvisa.ResourceManager('@py')
+    #     rm.list_resources()
+    #     # connect to a specific instrument
+    #     self._inst = rm.open_resource(visa_resource_id, timeout=1000, resource_pyclass=pyvisa.resources.USBInstrument)
+    #     self._connected = True
 
     def disconnect(self):
         if self._output:
-            self.output = False  # stop output
+            self._output = False  # stop output
         self._inst.close()
         self._connected = False

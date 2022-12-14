@@ -478,6 +478,7 @@ class HuPulserGui:
         if not self._pulser.connected:
             try:
                 self._pulser.connect('USB0::6833::1601::DG4E223201180::0::INSTR')
+                self._pulser.initialization()
             except Exception as e:
                 messagebox.showerror('Error', 'Connection to RigolDG4102 failed\n\n' + str(e))
             finally:

@@ -30,6 +30,14 @@ class HuPulser_gui {
     + on_closing()
 }
 
+class Instrument {
+    - _output
+    - _connected
+    - _inst
+
+    + connect()
+}
+
 class ItechIT6726VPowerSupply {
     - _mode <<get/set>>
     - _setpoint <<get>>
@@ -64,7 +72,6 @@ class ItechIT6726VPowerSupply {
     + clear_buffers()
     + calculate_average_values_for_mode_determination()
     + mode_determination()
-    + connect()
     + disconnect()
 }
 
@@ -85,7 +92,6 @@ class rigol_4102 {
     - _pos_pulse_length
     - _inst
 
-    + connect()
     + disconnect()
     + __parse_pulse_shape()
     + get_waveforms()
@@ -128,12 +134,12 @@ class dataBuffer {
     + clear()
     + average_value_from_last_n_values()
 }
-HuPulser_gui *-- MatplotlibPlot1axes : 1
-HuPulser_gui *-- MatplotlibPlot3axes : 1
-MatplotlibPlot1axes --> MatplotlibPlotBase
-MatplotlibPlot3axes --> MatplotlibPlotBase
-HuPulser_gui *-- ItechIT6726VPowerSupply : > 1
-HuPulser_gui *-- rigol_4102 : > 1
+HuPulser_gui *-- MatplotlibPlotBase : > 2
+MatplotlibPlot1axes --> MatplotlibPlotBase : 1
+MatplotlibPlot3axes --> MatplotlibPlotBase : 1
+HuPulser_gui *-- Instrument : > 2
+ItechIT6726VPowerSupply --> Instrument: > 1
+rigol_4102 --> Instrument: > 1
 ItechIT6726VPowerSupply *-- dataBuffer : > 5
 
 

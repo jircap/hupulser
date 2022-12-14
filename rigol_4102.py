@@ -2,15 +2,17 @@ import numpy as np
 from math import ceil
 import pyvisa
 import time as time_module
+from instrument import Instrument
 
 
-class RigolDG4102Pulser:
+class RigolDG4102Pulser(Instrument):
     def __init__(self):
+        super().__init__()
         self._num_wf_points = 16384
         self._amplitude = 3.7  # both channels have fixed amplitude 3.7 V
         self._frequency_coefficient_ch2 = 1.01
-        self._connected = False
-        self._output = False
+        # self._connected = False
+        # self._output = False
         self._ch2_enabled = False
         self._frequency = 10
         # or num_points-1 (how is interpolation done?)
@@ -21,18 +23,18 @@ class RigolDG4102Pulser:
         self._neg_pulse_length = 100
         self._pos_pulse_delay = 10
         self._pos_pulse_length = 20
-        self._inst = None
+        # self._inst = None
 
     @property  # connected
     def connected(self):  # get connected status
         return self._connected
 
-    def connect(self, visa_resource_id):
-        rm = pyvisa.ResourceManager('@py')
+    def initialization(self):
+        # rm = pyvisa.ResourceManager('@py')
         # connect to a specific instrument
 
-        self._inst = rm.open_resource(visa_resource_id, open_timeout=1000,
-                                      resource_pyclass=pyvisa.resources.USBInstrument)
+        # self._inst = rm.open_resource(visa_resource_id, open_timeout=1000,
+        #                               resource_pyclass=pyvisa.resources.USBInstrument)
         # instrument initialization
         self._inst.write(":SYSTem:PRESet DEFault")  # set the default values of the fun. generator
         self._inst.write(":DISPlay:BRIGhtness 100")  # set the brightness of the display
