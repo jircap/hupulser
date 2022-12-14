@@ -68,6 +68,58 @@ class ItechIT6726VPowerSupply {
     + disconnect()
 }
 
+class rigol_4102 {
+    - _num_wf_points
+    - _amplitude
+    - _frequency_coefficient_ch2
+    - _connected <<get>>
+    - _output <<get/set>>
+    - _ch2_enabled <<get/set>>
+    - _frequency <<get/set>>
+    - _pulse_shape <<get/set>>
+    - _ch1_waveform
+    - _ch2_waveform
+    - pulse_shape
+    - _neg_pulse_length
+    - _pos_pulse_delay
+    - _pos_pulse_length
+    - _inst
+
+    + connect()
+    + disconnect()
+    + __parse_pulse_shape()
+    + get_waveforms()
+    + get_period()
+    + __cmd_channel_state()
+    + __cmd_frequency()
+    + __cmd_negative_pulse_modulation()
+    + __cmd_positive_pulse_synchronization()
+    + __cmd_pulse_shape()
+}
+
+class MatplotlibPlotBase {
+    - _f
+    - canvas
+}
+
+class MatplotlibPlot1axes {
+    - _ax
+
+    + plot_waveforms()
+    + set_x_lim()
+}
+
+class MatplotlibPlot3axes {
+    - _ax1
+    - _ax2
+    - _ax3
+    - _y_max_values <<get>>
+
+    + set_y_max_values()
+    + plot_waveforms_realtime()
+    + make_patch_spines_invisible()
+}
+
 class dataBuffer {
     - _size
     - _buffer <<get>>
@@ -76,7 +128,13 @@ class dataBuffer {
     + clear()
     + average_value_from_last_n_values()
 }
+HuPulser_gui *-- MatplotlibPlot1axes : 1
+HuPulser_gui *-- MatplotlibPlot3axes : 1
+MatplotlibPlot1axes --> MatplotlibPlotBase
+MatplotlibPlot3axes --> MatplotlibPlotBase
 HuPulser_gui *-- ItechIT6726VPowerSupply : > 1
+HuPulser_gui *-- rigol_4102 : > 1
 ItechIT6726VPowerSupply *-- dataBuffer : > 5
+
 
 @enduml

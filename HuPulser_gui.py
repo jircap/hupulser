@@ -7,7 +7,7 @@ from rigol_4102 import RigolDG4102Pulser
 from ITECH_IT6726V_power_supply import ItechIT6726VPowerSupply
 import configparser
 from matplotlib.animation import FuncAnimation
-from matplotlib_plots import MatplotlibPlot, MatplotlibPlot3axes
+from matplotlib_plots import MatplotlibPlot1axes, MatplotlibPlot3axes
 import threading
 
 class HuPulserGui:
@@ -237,9 +237,8 @@ class HuPulserGui:
 
         self._anim = FuncAnimation(self._m_plot_ps, self._m_plot_ps.plot_waveforms_realtime,
                              fargs=(self._ps1.buffer_time, self._ps1.buffer_voltage, self._ps1.buffer_power,
-                                    self._ps1.buffer_current, self._ps1.buffer_voltage_ps, self._ps1.buffer_power_ps,
-                                    self._ps1.setpoints[1], self._ps1.setpoints[0], self._ps1.setpoints[2]), frames=10,
-                             interval=100)
+                                    self._ps1.buffer_current, self._ps1.buffer_voltage_ps, self._ps1.buffer_power_ps)
+                                   , frames=10, interval=100)
 
         ### PS PLOT CONFGI
         ps_plot_config = tk.Frame(ps_plot_frame, background=self.root['bg'], pady=30)
@@ -340,7 +339,7 @@ class HuPulserGui:
         plot_frame = tk.LabelFrame(main_frame, background=self.root['bg'], borderwidth=2, relief=tk.RIDGE,
                                    text='  PULSER PLOT  ')
         plot_frame.pack(side=tk.LEFT, fill=tk.Y, padx=2, pady=(5, 2))
-        self._m_plot_pulser = MatplotlibPlot(plot_frame)
+        self._m_plot_pulser = MatplotlibPlot1axes(plot_frame)
         self.scale_plot = tk.Scale(plot_frame, orient=tk.HORIZONTAL, from_=1, to=100,
                                    command=self.plot_change_scale, background=self.root['bg'])
         self.scale_plot.set(100)

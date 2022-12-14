@@ -4,44 +4,46 @@ import matplotlib.ticker as ticker
 import configparser
 from tkinter import messagebox
 
+
 # class for plotting the entered data using Matplotlib
-class MatplotlibPlot:
-    def __init__(self, master):     # initialization
-        self.f = Figure(figsize=(4, 2.5), dpi=100)    # set the Figure for plots
-        self.f.patch.set_facecolor('#f5f5f5')       # set color of the Figure
-        self.ax = self.f.add_axes([0.12, 0.2, 0.8, 0.75])             # add axes
-        self.canvas = FigureCanvasTkAgg(self.f, master=master)    # set the canvas
+class MatplotlibPlotBase:
+    def __init__(self, master, size_x, size_y):     # initialization
+        self._f = Figure()
+        self._f.patch.set_facecolor('#f5f5f5')       # set color of the Figure
+        self._f.set_size_inches(size_x, size_y)
+        self.canvas = FigureCanvasTkAgg(self._f, master=master)  # set the canvas
         self.canvas.get_tk_widget().pack()  # position the canvas in GUI
 
 
+class MatplotlibPlot1axes(MatplotlibPlotBase):
+    def __init__(self, master):     # initialization
+        super().__init__(master, size_x=4, size_y=2.5)
+        self._ax = self._f.add_axes([0.12, 0.2, 0.8, 0.75])             # add axes
+
     def plot_waveforms(self, t, wf1, wf2, ch2_state, period, scale):
-        self.ax.clear()  # clear the previous plot
+        self._ax.clear()  # clear the previous plot
         self.set_x_lim(period, scale)  # set x limits taking into account the current scale value
-        self.ax.set_xlabel('Time [$\\mathrm{\\mu s}$]')  # set x label
-        self.ax.set_ylabel('Amplitude')  # set y label
-        self.ax.plot(t, wf1, color='red')  # plot the wave form of the negative pulse using a red color
+        self._ax.set_xlabel('Time [$\\mathrm{\\mu s}$]')  # set x label
+        self._ax.set_ylabel('Amplitude')  # set y label
+        self._ax.plot(t, wf1, color='red')  # plot the wave form of the negative pulse using a red color
         if ch2_state:  # when CH2 is enabled
-            self.ax.plot(t, wf2, color='blue')  # plot the wave form of the positive pulse using a blue color
-        self.ax.set_ylim(-0.2, 1.2)
-        self.ax.set_yticks([0, 1])
+            self._ax.plot(t, wf2, color='blue')  # plot the wave form of the positive pulse using a blue color
+        self._ax.set_ylim(-0.2, 1.2)
+        self._ax.set_yticks([0, 1])
         self.canvas.draw()  # show the canvas at the screen
 
     def set_x_lim(self, period, scale):
         max_value = period/100*scale
         x_offset = max_value/10
-        self.ax.set_xlim(-x_offset, period/100*scale + x_offset)
+        self._ax.set_xlim(-x_offset, period/100*scale + x_offset)
 
 
-class MatplotlibPlot3axes:
+class MatplotlibPlot3axes(MatplotlibPlotBase):
     def __init__(self, master):  # initialization
-        self._f = Figure(figsize=(5, 2.5), dpi=100)  # set the Figure for plots
-        self._f.patch.set_facecolor('#f5f5f5')  # set color of the Figure
+        super().__init__(master, size_x=5, size_y=2.5)
         self._ax1 = self._f.add_axes([0.125, 0.2, 0.615, 0.75])  # add axes
         self._ax2 = self._ax1.twinx()
         self._ax3 = self._ax1.twinx()
-        # Second, show the right spine.
-        self.canvas = FigureCanvasTkAgg(self._f, master=master)  # set the canvas
-        self.canvas.get_tk_widget().pack()  # position the canvas in GUI
         self._y_max_values = [0.0, 0.0, 0.0]  # (Ax1, Ax2, Ax3)
         self.config = configparser.ConfigParser()
         self.config.read('hupulser.ini')
@@ -72,8 +74,7 @@ class MatplotlibPlot3axes:
         else:
             self._y_max_values[int_ax_number] = float_value
 
-    def plot_waveforms_realtime(self, iter_number, time, voltage, power, current, voltage_ps, power_ps,
-                                set_point_voltage, set_point_power, set_point_current):
+    def plot_waveforms_realtime(self, iter_number, time, voltage, power, current, voltage_ps, power_ps):
         self._ax1.clear()  # clear the previous plot
         self._ax2.clear()  # clear the previous plot
         self._ax3.clear()  # clear the previous plot
