@@ -575,6 +575,7 @@ class HuPulserGui:
         self._config.set('Pulser', 'ch2_enabled', str(self._pulser.ch2_enabled))
 
         config_path = os.path.join(os.path.dirname(__file__), 'hupulser.ini')
+        # with open('hupulser.ini', 'w') as config_file: # Linux version
         with open(config_path, 'w') as config_file:
             self._config.write(config_file)
         self.root.destroy()
