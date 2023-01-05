@@ -9,6 +9,8 @@ import configparser
 from matplotlib.animation import FuncAnimation
 from matplotlib_plots import MatplotlibPlot1axes, MatplotlibPlot3axes
 import threading
+import os
+
 
 class HuPulserGui:
     def __init__(self, master):
@@ -19,7 +21,9 @@ class HuPulserGui:
         self._pulser = RigolDG4102Pulser()
         # load last state of instruments
         self._config = configparser.ConfigParser()
-        self._config.read('hupulser.ini')
+        # self._config.read('hupulser.ini') # Linux version
+        config_path = os.path.join(os.path.dirname(__file__), 'hupulser.ini')
+        self._config.read(config_path)
         try:
             self._ps1.set_setpoint_for_mode(0, self._config['DC1']['setpoint_voltage'])
             self._ps1.set_setpoint_for_mode(1, self._config['DC1']['setpoint_power'])
@@ -37,7 +41,7 @@ class HuPulserGui:
         main_frame = tk.Frame(master, background=self.root['bg'])
         main_frame.pack(side=tk.TOP)
         # status bar
-        self.status = tk.StringVar('')
+        self.status = tk.StringVar(None)
         self.status_bar = tk.Label(master, textvariable=self.status, bd=1, relief=tk.SUNKEN, anchor=tk.W)
         self.status_bar.pack(side=tk.BOTTOM, fill=tk.X)
 
@@ -570,6 +574,7 @@ class HuPulserGui:
         self._config.set('Pulser', 'pulse_shape', ','.join(self.text_pulser_shape.get("1.0", 'end').split()))
         self._config.set('Pulser', 'ch2_enabled', str(self._pulser.ch2_enabled))
 
-        with open('hupulser.ini', 'w') as config_file:
+        config_path = os.path.join(os.path.dirname(__file__), 'hupulser.ini')
+        with open(config_path, 'w') as config_file:
             self._config.write(config_file)
         self.root.destroy()

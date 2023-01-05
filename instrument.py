@@ -8,7 +8,8 @@ class Instrument:
         self._inst = None   # representation of the PS for read/write commands
 
     def connect(self, visa_resource_id):
-        rm = pyvisa.ResourceManager('@py')
+        # rm = pyvisa.ResourceManager('@py')    # Linux version
+        rm = pyvisa.ResourceManager('')
         rm.list_resources()
         # connect to a specific instrument
         self._inst = rm.open_resource(visa_resource_id, timeout=1000, resource_pyclass=pyvisa.resources.USBInstrument)

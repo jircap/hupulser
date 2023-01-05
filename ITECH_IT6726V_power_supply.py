@@ -6,6 +6,7 @@ import configparser
 from data_buffer import DataBuffer
 from tkinter import messagebox
 from instrument import Instrument
+import os
 
 
 # DC power supply ITECH_IT6726V
@@ -21,7 +22,9 @@ class ItechIT6726VPowerSupply(Instrument):
         self._status = {'outputON': False}
         self._thread = None
         self._config = configparser.ConfigParser()
-        self._config.read('hupulser.ini')    # read file with initial settings
+        # self._config.read('hupulser.ini') # Linux version
+        config_path = os.path.join(os.path.dirname(__file__), 'hupulser.ini')
+        self._config.read(config_path, encoding='utf-8')    # read file with initial settings
         try:
             # number of values in the buffer; used for storing the data and for plotting
             self._buffer_no_elements = int(self._config['DC1']['buffer_size'])

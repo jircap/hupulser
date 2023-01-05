@@ -3,6 +3,7 @@ from matplotlib.figure import Figure
 import matplotlib.ticker as ticker
 import configparser
 from tkinter import messagebox
+import os
 
 
 # class for plotting the entered data using Matplotlib
@@ -46,7 +47,9 @@ class MatplotlibPlot3axes(MatplotlibPlotBase):
         self._ax3 = self._ax1.twinx()
         self._y_max_values = [0.0, 0.0, 0.0]  # (Ax1, Ax2, Ax3)
         self.config = configparser.ConfigParser()
-        self.config.read('hupulser.ini')
+        # self._config.read('hupulser.ini') # Linux version
+        config_path = os.path.join(os.path.dirname(__file__), 'hupulser.ini')
+        self.config.read(config_path)
         try:
             self.set_y_max_values(0, self.config['DC1 - plot']['max_voltage'])
             self.set_y_max_values(1, self.config['DC1 - plot']['max_power'])
