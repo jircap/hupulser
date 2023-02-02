@@ -28,12 +28,14 @@ class HuPulserGui:
             self._ps1.set_setpoint_for_mode(0, self._config['DC1']['setpoint_voltage'])
             self._ps1.set_setpoint_for_mode(1, self._config['DC1']['setpoint_power'])
             self._ps1.set_setpoint_for_mode(2, self._config['DC1']['setpoint_current'])
+            self._ps1.set_setpoint_for_mode(2, self._config['DC1']['setpoint_current'])
         except KeyError:
             messagebox.showinfo('Info', 'Some config values for DC1 not found in ini file.')
         try:
             self._pulser.frequency = self._config['Pulser']['frequency']
             self._pulser.pulse_shape = self._config['Pulser']['pulse_shape'].split(',')
             self._pulser.ch2_enabled = self._config['Pulser']['ch2_enabled'] == 'True'
+            self._over_voltage_protection = self._config['DC1']['over_voltage_protection']
         except KeyError:
             messagebox.showinfo('Info', 'Some config values for Pulser not found in ini file.')
 
@@ -240,8 +242,8 @@ class HuPulserGui:
         self._m_plot_ps = MatplotlibPlot3axes(ps_plot_frame)
 
         self._anim = FuncAnimation(self._m_plot_ps, self._m_plot_ps.plot_waveforms_realtime,
-                             fargs=(self._ps1.buffer_time, self._ps1.buffer_voltage, self._ps1.buffer_power,
-                                    self._ps1.buffer_current, self._ps1.buffer_voltage_ps, self._ps1.buffer_power_ps)
+                             fargs=(self._ps1.buffer_time, self._ps1.buffer_voltage_ps, self._ps1.buffer_power_ps,
+                                    self._ps1.buffer_current_ps)
                                    , frames=10, interval=100)
 
         ### PS PLOT CONFGI
@@ -369,6 +371,8 @@ class HuPulserGui:
                 self.indicator_ps1_connected.on = self._ps1.connected
                 self._ps1.inst.write("*CLS")     # clean the PS register
                 self._ps1.inst.write("*RST")     # set the PS default settings
+                self._ps1.inst.write("CURR:LEVel 0")  # set the PS default settings
+                self._ps1.inst.write("VOLT:PROT " + str(self._over_voltage_protection))
         else:
             self.ps1_stop()
             self._ps1.disconnect()
@@ -384,9 +388,9 @@ class HuPulserGui:
     def ps1_periodic_update(self):
         while self._ps1.output:
             # take the last value from the corresponding buffers
-            self.label_ps1_voltage_live.config(text=str(round(self._ps1.buffer_voltage[-1])))
-            self.label_ps1_power_live.config(text=str(round(self._ps1.buffer_power[-1])))
-            self.label_ps1_current_live.config(text=str(round(self._ps1.buffer_current[-1])))
+            self.label_ps1_voltage_live.config(text=str(round(self._ps1.buffer_voltage_ps[-1])))
+            self.label_ps1_power_live.config(text=str(round(self._ps1.buffer_power_ps[-1])))
+            self.label_ps1_current_live.config(text=str(round(self._ps1.buffer_current_ps[-1])))
             # activate the corresponding indicator based on the actual mode
             if self._ps1.mode == 0:
                 self.indicator_ps1_voltage_regime.on = True
@@ -446,7 +450,7 @@ class HuPulserGui:
         self._ps1.output = not self._ps1.output
         self.indicator_ps1_output.on = self._ps1.status['outputON']
         if not self._ps1.output:
-            self._ps1.mode = 1  # initial mode is Power mode
+            self._ps1.mode = 1 # initial mode is Power mode
             self.indicator_ps1_voltage_regime.on = False
             self.indicator_ps1_power_regime.on = False
             self.indicator_ps1_current_regime.on = False

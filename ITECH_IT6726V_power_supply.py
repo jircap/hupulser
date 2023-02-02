@@ -40,7 +40,6 @@ class ItechIT6726VPowerSupply(Instrument):
             self._mode_determination_no_of_values = 5
         # initialization of individual buffers
         self._buffer_time = DataBuffer(self._buffer_no_elements)
-        self._buffer_voltage_calc = DataBuffer(self._buffer_no_elements)
         self._buffer_voltage_ps = DataBuffer(self._buffer_no_elements)
         self._buffer_power_ps = DataBuffer(self._buffer_no_elements)
         self._buffer_current_ps = DataBuffer(self._buffer_no_elements)
@@ -154,24 +153,16 @@ class ItechIT6726VPowerSupply(Instrument):
         return self._buffer_time.buffer
 
     @property
-    def buffer_voltage(self):
-        return self._buffer_voltage_calc.buffer
-
-    @property
     def buffer_voltage_ps(self):
         return self._buffer_voltage_ps.buffer
 
     @property
-    def buffer_power(self):
-        return self._buffer_power_ps.buffer
-
-    @property
-    def buffer_current(self):
-        return self._buffer_current_ps.buffer
-
-    @property
     def buffer_power_ps(self):
         return self._buffer_power_ps.buffer
+
+    @property
+    def buffer_current_ps(self):
+        return self._buffer_current_ps.buffer
 
     def get_pid_values(self, mode):
         # return PID values for the current mode
@@ -221,6 +212,7 @@ class ItechIT6726VPowerSupply(Instrument):
             e_prev = self.setpoints[self.mode]
         elif self.mode == 1:
             e_prev = self.setpoints[self.mode]
+            self._inst.write("VOLT " + str(self._over_voltage_protection)) # enable to use maximum voltage for power control
         elif self.mode == 2:
             e_prev = self.setpoints[self.mode]
         mode_prev = self.mode   # keep the initial mode value
@@ -229,32 +221,37 @@ class ItechIT6726VPowerSupply(Instrument):
         while self._status['outputON']:     # until output is not turned off
             voltage_ps, power_ps, current_ps = self.read_actual_value_for_pid()
             self._mode = self.mode_determination(avg_buffer_voltage_ps, avg_buffer_power_ps, avg_buffer_current_ps, mode_prev)
-            if not mode_prev == self.mode:  # if the mode was changed
-                e_sum = u_prev
             if self.mode == 0:  # voltage mode
+                if not mode_prev == self.mode:  # if the mode was changed
+                    e_sum = voltage_ps  # set initial value for PID (for better transition)
                 actual_value = voltage_ps
-                time_prev, e_prev, e_sum, u_prev = self.pid_control_one_cycle(time_start, time_prev, e_prev,
+                time_prev, e_prev, e_sum = self.pid_control_one_cycle_voltage(time_start, time_prev, e_prev,
                                                                                 e_sum, p_voltage, i_voltage,
                                                                                 d_voltage, actual_value,
                                                                                 self.setpoints[self.mode])
             if self.mode == 1:  # power mode
+                if not mode_prev == self.mode:  # if the mode was changed
+                    e_sum = 150     # set initial value for PID (for better transition)
                 actual_value = power_ps
-                time_prev, e_prev, e_sum, u_prev = self.pid_control_one_cycle(time_start, time_prev, e_prev,
+                time_prev, e_prev, e_sum = self.pid_control_one_cycle_power_current(time_start, time_prev, e_prev,
                                                                         e_sum, p_power, i_power, d_power, actual_value,
                                                                         self.setpoints[self.mode])
             if self.mode == 2:  # current mode
+                if not mode_prev == self.mode:  # if the mode was changed
+                    e_sum = 100     # set initial value for PID (for better transition)
                 actual_value = current_ps
-                time_prev, e_prev, e_sum, u_prev = self.pid_control_one_cycle(time_start, time_prev, e_prev,
-                                                                        e_sum, p_current, i_current, d_current,
-                                                                        actual_value, self.setpoints[self.mode])
+                time_prev, e_prev, e_sum = self.pid_control_one_cycle_power_current(time_start, time_prev, e_prev,
+                                                                                    e_sum, p_current, i_current, d_current,
+                                                                                    actual_value,
+                                                                                    self.setpoints[self.mode])
 
-            self.add_values_to_buffers(time_prev, u_prev, voltage_ps, power_ps, current_ps)
+            self.add_values_to_buffers(time_prev, voltage_ps, power_ps, current_ps)
             avg_buffer_voltage_ps, avg_buffer_power_ps, avg_buffer_current_ps = \
                             self.calculate_average_values_for_mode_determination(self._mode_determination_no_of_values)
             mode_prev = self.mode   # keep the actual mode for the next run
             time.sleep(self._pid_sleep_time)    # allow the PS voltage to react on the request
 
-    def pid_control_one_cycle(self, time_start, time_prev, e_prev, e_sum, p, i, d, actual_value, desired_value):
+    def pid_control_one_cycle_voltage(self, time_start, time_prev, e_prev, e_sum, p, i, d, actual_value, desired_value):
         e = desired_value - actual_value  # calculate the actual error of the power (P element)
         time_act = time.time() - time_start  # get the actual time in seconds
         dt = time_act - time_prev  # calculate the time duration of the cycle
@@ -264,13 +261,25 @@ class ItechIT6726VPowerSupply(Instrument):
         e_prev = e  # keep the actual error for the next cycle
         u = p * e + i * e_sum + d * dedt  # calculate the new voltage value
         u = round(u, 1)     # round the value
-        if u < self._under_voltage_protection:
-            u = self._under_voltage_protection
+        # if u < self._under_voltage_protection:
+        #      u = self._under_voltage_protection
         if u > self._over_voltage_protection:
             u = self._over_voltage_protection
         self._inst.write("VOLT " + str(u))  # send the new voltage value to the PS
-        u_prev = u  # keep the actual voltage
-        return time_prev, e_prev, e_sum, u_prev
+        # u_prev = u  # keep the actual voltage
+        return time_prev, e_prev, e_sum
+
+    def pid_control_one_cycle_power_current(self, time_start, time_prev, e_prev, e_sum, p, i, d, actual_value, desired_value):
+        e = desired_value - actual_value  # calculate the actual error of the power (P element)
+        time_act = time.time() - time_start  # get the actual time in seconds
+        dt = time_act - time_prev  # calculate the time duration of the cycle
+        e_sum = e_sum + e * dt  # calculate the integral of the power error (I element)
+        dedt = (e - e_prev) / dt  # calculate time derivation of the power error (D element)
+        time_prev = time_act  # keep the actual time for the next cycle
+        e_prev = e  # keep the actual error for the next cycle
+        current = p * e + i * e_sum + d * dedt  # calculate the new voltage value
+        self._inst.write("CURR:LEVEl " + str(current/1000))
+        return time_prev, e_prev, e_sum
 
     def read_actual_value_for_pid(self):
         # read actual values from the PS
@@ -285,16 +294,14 @@ class ItechIT6726VPowerSupply(Instrument):
             print("Communication issue - error : {}".format(exc.strerror))
         return value_voltage_ps, value_power_ps, value_current_ps
 
-    def add_values_to_buffers(self, process_time, voltage_calc, voltage_ps, power_ps, current_ps):
+    def add_values_to_buffers(self, process_time, voltage_ps, power_ps, current_ps):
         self._buffer_time.update(process_time)
-        self._buffer_voltage_calc.update(voltage_calc)
         self._buffer_voltage_ps.update(voltage_ps)
         self._buffer_power_ps.update(power_ps)
         self._buffer_current_ps.update(current_ps)
 
     def clear_buffers(self):
         self._buffer_time.clear()
-        self._buffer_voltage_calc.clear()
         self._buffer_voltage_ps.clear()
         self._buffer_power_ps.clear()
         self._buffer_current_ps.clear()

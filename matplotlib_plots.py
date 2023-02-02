@@ -77,7 +77,7 @@ class MatplotlibPlot3axes(MatplotlibPlotBase):
         else:
             self._y_max_values[int_ax_number] = float_value
 
-    def plot_waveforms_realtime(self, iter_number, time, voltage, power, current, voltage_ps, power_ps):
+    def plot_waveforms_realtime(self, iter_number, time, voltage_ps, power_ps, current_ps):
         self._ax1.clear()  # clear the previous plot
         self._ax2.clear()  # clear the previous plot
         self._ax3.clear()  # clear the previous plot
@@ -88,14 +88,11 @@ class MatplotlibPlot3axes(MatplotlibPlotBase):
         self._ax1.set_ylabel('Voltage (V)')  # set y label
         self._ax2.set_ylabel('Power (W)')  # set y label
         self._ax3.set_ylabel('Current (mA)')  # set y label
-        p1, = self._ax1.plot(time, voltage,
+        p1, = self._ax1.plot(time, voltage_ps,
                                 color='blue')  # plot the wave form of the negative pulse using a red color
-        p1, = self._ax1.plot(time, voltage_ps, color='blue',
-                                linestyle="dashed")  # plot the wave form of the negative pulse using a red color
-        p2, = self._ax2.plot(time, power,
+        p2, = self._ax2.plot(time, power_ps,
                                 color='black')  # plot the wave form of the negative pulse using a red color
-        p2, = self._ax2.plot(time, power_ps, color='black', linestyle="dashed")
-        p3, = self._ax3.plot(time, current,
+        p3, = self._ax3.plot(time, current_ps,
                                 color='red')  # plot the wave form of the negative pulse using a red color
         self._ax1.yaxis.label.set_color(p1.get_color())
         self._ax2.yaxis.label.set_color(p2.get_color())
