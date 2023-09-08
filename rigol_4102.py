@@ -155,9 +155,9 @@ class RigolDG4102Pulser(Instrument):
                 raise ValueError('Pulse length is shorter than minimal step (' + str(dt) +
                                  ') determined by given frequency')
             value_step = round(value / dt)  # divide by dt and round
-            if value_step * dt < 5.:  # if lower than 5 us (limit), try rounding up
+            if value_step * dt < 3.:  # if lower than 3 us (limit), try rounding up
                 value_step = ceil(value / dt)  # divide by dt and round
-            if value_step * dt < 5.:  # interval shorter than 5 us not allowed to ensure power supply is safe
+            if value_step * dt < 3.:  # interval shorter than 3 us not allowed to ensure power supply is safe
                 raise ValueError('Pulse or delay length must be longer than 5 us')
             time_step.append(time_step[-1] + value_step)
         if time_step[-1] >= self._num_wf_points:
